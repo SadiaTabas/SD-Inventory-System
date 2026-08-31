@@ -4,13 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Models\Category;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class CategoryController extends Controller
 {
     // Show all categories
     public function index()
     {
-        $categories = Category::all();
+        $categories = Category::latest()->get();
 
         return view('categories.index', [
             'categories' => $categories
@@ -29,12 +30,14 @@ class CategoryController extends Controller
         $request->validate([
             'name' => 'required|string|max:255|unique:categories,name',
             'description' => 'nullable|string',
+            'status' => 'nullable|boolean',
         ]);
 
         Category::create([
             'name' => $request->name,
             'description' => $request->description,
-            'status' => true,
+            'status' => $request->has('status') ? (bool) $request->status : true,
+            'created_by' => Auth::user()->name ?? 'System',
         ]);
 
         return redirect()
@@ -63,6 +66,7 @@ class CategoryController extends Controller
             'name' => $request->name,
             'description' => $request->description,
             'status' => $request->status,
+            'updated_by' => Auth::user()->name ?? 'System',
         ]);
 
         return redirect()
@@ -73,6 +77,13 @@ class CategoryController extends Controller
     // Delete category
     public function destroy(Category $category)
     {
+        // Prevent deletion if category contains products
+        if ($category->products()->count() > 0) {
+            return redirect()
+                ->route('category.index')
+                ->with('error', 'Cannot delete category containing existing products.');
+        }
+
         $category->delete();
 
         return redirect()

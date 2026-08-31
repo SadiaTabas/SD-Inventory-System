@@ -5,129 +5,127 @@
 @section('content')
 
 <div class="container">
- 
-<h1>Category Management</h1>
 
-@if (session('success'))
+    <h1>Category Management</h1>
 
-    <div class="success-message">
-        {{ session('success') }}
+    @if (session('success'))
+        <div class="success-message">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if (session('error'))
+        <div class="error-box">
+            {{ session('error') }}
+        </div>
+    @endif
+
+    <div class="top-actions">
+        <a
+            class="create-button"
+            href="{{ route('category.create') }}"
+        >
+            + Create New Category
+        </a>
     </div>
 
-@endif
+    <div class="table-container">
 
-<a
-    class="create-button"
-    href="{{ route('category.create') }}"
->
-    + Create New Category
-</a>
+        <table>
 
-<div class="table-container">
-
-    <table>
-
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Description</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-
-        <tbody>
-
-            @forelse ($categories as $category)
-
+            <thead>
                 <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created By</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
 
-                    <td>
-                        {{ $category->id }}
-                    </td>
+            <tbody>
 
-                    <td>
-                        <strong>{{ $category->name }}</strong>
-                    </td>
+                @forelse ($categories as $category)
 
-                    <td>
-                        {{ $category->description ?: 'No description' }}
-                    </td>
+                    <tr>
 
-                    <td>
+                        <td>
+                            {{ $category->id }}
+                        </td>
 
-                        @if ($category->status)
+                        <td>
+                            <strong>{{ $category->name }}</strong>
+                        </td>
 
-                            <span class="status active">
-                                Active
-                            </span>
+                        <td>
+                            {{ $category->description ?: 'No description' }}
+                        </td>
 
-                        @else
+                        <td>
+                            @if ($category->status)
+                                <span class="status active">Active</span>
+                            @else
+                                <span class="status inactive">Inactive</span>
+                            @endif
+                        </td>
 
-                            <span class="status inactive">
-                                Inactive
-                            </span>
+                        <td>
+                            <small style="color: #6b7280;">{{ $category->created_by ?? 'System' }}</small>
+                        </td>
 
-                        @endif
+                        <td>
 
-                    </td>
+                            <div class="action-buttons">
 
-                    <td>
-
-                        <div class="action-buttons">
-
-                            <a
-                                class="edit-button"
-                                href="{{ route('category.edit', $category) }}"
-                            >
-                                Edit
-                            </a>
-
-                            <form
-                                class="delete-form"
-                                method="POST"
-                                action="{{ route('category.destroy', $category) }}"
-                                onsubmit="return confirm('Are you sure you want to delete this category?');"
-                            >
-
-                                @csrf
-                                @method('DELETE')
-
-                                <button
-                                    class="delete-button"
-                                    type="submit"
+                                <a
+                                    class="edit-button"
+                                    href="{{ route('category.edit', $category) }}"
                                 >
-                                    Delete
-                                </button>
+                                    Edit
+                                </a>
 
-                            </form>
+                                <form
+                                    class="delete-form"
+                                    method="POST"
+                                    action="{{ route('category.destroy', $category) }}"
+                                    onsubmit="return confirm('Are you sure you want to delete this category?');"
+                                >
+                                    @csrf
+                                    @method('DELETE')
 
-                        </div>
+                                    <button
+                                        class="delete-button"
+                                        type="submit"
+                                    >
+                                        Delete
+                                    </button>
+                                </form>
 
-                    </td>
+                            </div>
 
-                </tr>
+                        </td>
 
-            @empty
+                    </tr>
 
-                <tr>
-                    <td
-                        colspan="5"
-                        class="empty-message"
-                    >
-                        No categories found.
-                    </td>
-                </tr>
+                @empty
 
-            @endforelse
+                    <tr>
+                        <td
+                            colspan="6"
+                            class="empty-message"
+                        >
+                            No categories found.
+                        </td>
+                    </tr>
 
-        </tbody>
+                @endforelse
 
-    </table>
+            </tbody>
 
-</div>
- 
+        </table>
+
+    </div>
 
 </div>
 

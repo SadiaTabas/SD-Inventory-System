@@ -15,8 +15,13 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->string('email')->unique();
+            $table->string('phone', 50)->nullable();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
+            $table->enum('role', ['admin', 'customer'])->default('customer');
+            $table->boolean('status')->default(true);
+            $table->string('created_by')->nullable();
+            $table->string('updated_by')->nullable();
             $table->rememberToken();
             $table->timestamps();
         });
@@ -37,9 +42,7 @@ return new class extends Migration
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
+    
     public function down(): void
     {
         Schema::dropIfExists('users');

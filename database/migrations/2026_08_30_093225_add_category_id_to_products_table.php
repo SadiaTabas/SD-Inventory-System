@@ -12,24 +12,24 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('products', function (Blueprint $table) {
-
-            $table->foreignId('category_id')
-                  ->constrained('categories')
-                  ->onDelete('cascade');
-
+            if (!Schema::hasColumn('products', 'category_id')) {
+                $table->foreignId('category_id')
+                      ->nullable()
+                      ->after('id')
+                      ->constrained('categories')
+                      ->nullOnDelete();
+            }
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
+   
     public function down(): void
     {
         Schema::table('products', function (Blueprint $table) {
-
-            $table->dropForeign(['category_id']);
-            $table->dropColumn('category_id');
-
+            if (Schema::hasColumn('products', 'category_id')) {
+                $table->dropForeign(['category_id']);
+                $table->dropColumn('category_id');
+            }
         });
     }
 };

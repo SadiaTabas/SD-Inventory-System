@@ -15,13 +15,18 @@ class LoginController extends Controller
 
     public function login(Request $request)
     {
-        $credentials = $request->validate([
+        $request->validate([
             'email' => 'required|email',
             'password' => 'required',
         ]);
 
-        if (Auth::attempt($credentials)) {
+        $credentials = [
+            'email' => $request->email,
+            'password' => $request->password,
+            'status' => 1, // Ensures only active accounts can log in
+        ];
 
+        if (Auth::attempt($credentials, $request->filled('remember'))) {
             $request->session()->regenerate();
 
             // Redirect based on user role
@@ -29,11 +34,11 @@ class LoginController extends Controller
                 return redirect()->route('admin.dashboard');
             }
 
-            return redirect()->route('customer.dashboard');
+            return redirect()->intended('/');
         }
 
         return back()->withErrors([
-            'email' => 'The provided email or password is incorrect.',
+            'email' => 'The provided credentials do not match our records or your account is deactivated.',
         ])->onlyInput('email');
     }
 

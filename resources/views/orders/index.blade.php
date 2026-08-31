@@ -14,12 +14,14 @@
         </div>
     @endif
 
-    <a
-        href="{{ route('order.create') }}"
-        class="create-button"
-    >
-        + Create New Order
-    </a>
+    <div class="top-actions">
+        <a
+            href="{{ route('order.create') }}"
+            class="create-button"
+        >
+            + Create New Order
+        </a>
+    </div>
 
     <div class="table-container">
 
@@ -27,12 +29,12 @@
 
             <thead>
                 <tr>
-                    <th>ID</th>
+                    <th>Order No</th>
                     <th>Customer</th>
+                    <th>Rider</th>
                     <th>Total</th>
-                    <th>Order Status</th>
                     <th>Payment</th>
-                    <th>Delivery</th>
+                    <th>Delivery Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -44,13 +46,17 @@
                     <tr>
 
                         <td>
-                            {{ $order->id }}
+                            <strong>{{ $order->order_number ?? ('#' . $order->id) }}</strong>
                         </td>
 
                         <td>
-                            <strong>
-                                {{ $order->customer->name }}
-                            </strong>
+                            <strong>{{ $order->customer->name ?? 'User Deleted' }}</strong>
+                            <br>
+                            <small>{{ $order->customer->phone ?? '' }}</small>
+                        </td>
+
+                        <td>
+                            {{ $order->deliveryAgent->name ?? ($order->delivery_man_name ?? 'Unassigned') }}
                         </td>
 
                         <td>
@@ -58,15 +64,17 @@
                         </td>
 
                         <td>
-                            {{ ucfirst($order->status) }}
+                            <span class="status {{ $order->payment_status === 'paid' ? 'active' : 'inactive' }}">
+                                {{ ucfirst($order->payment_status) }}
+                            </span>
+                            <br>
+                            <small>{{ strtoupper($order->payment_method ?? 'COD') }}</small>
                         </td>
 
                         <td>
-                            {{ ucfirst($order->payment_status) }}
-                        </td>
-
-                        <td>
-                            {{ ucfirst($order->delivery_status) }}
+                            <span class="status {{ $order->delivery_status === 'delivered' ? 'active' : 'inactive' }}">
+                                {{ ucfirst(str_replace('_', ' ', $order->delivery_status)) }}
+                            </span>
                         </td>
 
                         <td>
@@ -74,7 +82,7 @@
                             <div class="action-buttons">
 
                                 <a
-                                    class="edit-button"
+                                    class="view-button"
                                     href="{{ route('order.show', $order) }}"
                                 >
                                     View
@@ -91,9 +99,8 @@
                                     class="delete-form"
                                     method="POST"
                                     action="{{ route('order.destroy', $order) }}"
-                                    onsubmit="return confirm('Are you sure you want to delete this order?');"
+                                    onsubmit="return confirm('Are you sure you want to delete this order? Stock will be restored.');"
                                 >
-
                                     @csrf
                                     @method('DELETE')
 
@@ -103,7 +110,6 @@
                                     >
                                         Delete
                                     </button>
-
                                 </form>
 
                             </div>

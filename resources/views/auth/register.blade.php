@@ -16,7 +16,7 @@
 
         .container {
             width: 400px;
-            margin: 80px auto;
+            margin: 60px auto;
             background: white;
             padding: 30px;
             border-radius: 8px;
@@ -41,15 +41,19 @@
             width: 100%;
             padding: 10px;
             box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
         }
 
         button {
             width: 100%;
-            padding: 10px;
+            padding: 12px;
             background-color: #333;
             color: white;
             border: none;
+            border-radius: 4px;
             cursor: pointer;
+            font-weight: bold;
         }
 
         button:hover {
@@ -64,6 +68,21 @@
         .success {
             color: green;
             margin-bottom: 15px;
+        }
+
+        .login-link {
+            text-align: center;
+            margin: 15px 0 20px;
+        }
+
+        .login-link a {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: bold;
+        }
+
+        .login-link a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -92,47 +111,67 @@
 
         @csrf
 
+        {{-- Name --}}
         <div class="form-group">
             <label>Name</label>
             <input
                 type="text"
                 name="name"
-                placeholder="Enter your name"
+                placeholder="Enter your full name"
                 value="{{ old('name') }}"
+                required
             >
         </div>
 
+        {{-- Email --}}
         <div class="form-group">
-            <label>Email</label>
+            <label>Email Address</label>
             <input
                 type="email"
                 name="email"
                 placeholder="Enter your email"
                 value="{{ old('email') }}"
+                required
             >
         </div>
 
+        {{-- Phone Number --}}
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input
+                type="text"
+                name="phone"
+                placeholder="e.g. 01700000000"
+                value="{{ old('phone') }}"
+            >
+        </div>
+
+        {{-- Password --}}
         <div class="form-group">
             <label>Password</label>
             <input
                 type="password"
                 name="password"
-                placeholder="Enter your password"
+                placeholder="Min 8 chars, 1 uppercase, 1 number, 1 symbol"
+                required
             >
         </div>
 
+        {{-- Confirm Password --}}
         <div class="form-group">
             <label>Confirm Password</label>
             <input
                 type="password"
                 name="password_confirmation"
                 placeholder="Confirm your password"
+                required
             >
         </div>
-        <p>
-    Already have an account?
-    <a href="{{ route('login') }}">Login</a>
-</p>
+
+        <p class="login-link">
+            Already have an account?
+            <a href="{{ route('login') }}">Login here</a>
+        </p>
 
         <button type="submit">
             Sign Up

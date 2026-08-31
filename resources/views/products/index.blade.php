@@ -6,135 +6,145 @@
 
 <div class="container">
 
- 
-<h1>Product List</h1>
+    <h1>Product Inventory</h1>
 
-{{-- Success Message --}}
-@if (session('success'))
-    <div class="success-message">
-        {{ session('success') }}
+    {{-- Success Message --}}
+    @if (session('success'))
+        <div class="success-message">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    {{-- Create Product Button --}}
+    <div class="top-actions">
+        <a
+            class="create-button"
+            href="{{ route('product.create') }}"
+        >
+            + Create New Product
+        </a>
     </div>
-@endif
 
-{{-- Create Product --}}
-<a
-    class="create-button"
-    href="{{ route('product.create') }}"
->
-    + Create New Product
-</a>
+    <div class="table-container">
 
-<div class="table-container">
+        <table>
 
-    <table>
-
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Category</th>
-                <th>Qty</th>
-                <th>Price</th>
-                <th>Description</th>
-                <th>Action</th>
-            </tr>
-        </thead>
-
-        <tbody>
-
-            @forelse ($products as $product)
-
+            <thead>
                 <tr>
+                    <th>Image</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Stock</th>
+                    <th>Price</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
 
-                    <td class="id">
-                        {{ $product->id }}
-                    </td>
+            <tbody>
 
-                    <td>
-                        <strong>{{ $product->name }}</strong>
-                    </td>
+                @forelse ($products as $product)
 
-                    <td>
-                        {{ $product->category->name ?? 'No Category' }}
-                    </td>
+                    <tr>
 
-                    <td>
-                        {{ $product->qty }}
-                    </td>
-
-                    <td>
-                        {{ $product->price }}
-                    </td>
-
-                    <td>
-                        {{ $product->description ?: 'No description' }}
-                    </td>
-
-                    <td>
-
-                        <div class="action-buttons">
-
-                            {{-- Edit --}}
-                            <a
-                                class="edit-button"
-                                href="{{ route('product.edit', $product) }}"
-                            >
-                                Edit
-                            </a>
-
-                            {{-- Delete --}}
-                            <form
-                                class="delete-form"
-                                method="POST"
-                                action="{{ route('product.destroy', $product) }}"
-                                onsubmit="return confirm('Are you sure you want to delete this product?');"
-                            >
-
-                                @csrf
-                                @method('DELETE')
-
-                                <button
-                                    class="delete-button"
-                                    type="submit"
+                        <td>
+                            @if ($product->image && file_exists(public_path($product->image)))
+                                <img
+                                    src="{{ asset($product->image) }}"
+                                    alt="{{ $product->name }}"
+                                    style="width: 50px; height: 50px; object-fit: cover; border-radius: 8px; border: 1px solid #e5e7eb;"
                                 >
-                                    Delete
-                                </button>
+                            @else
+                                <div style="width: 50px; height: 50px; background: #e0f2fe; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 20px;">
+                                    📦
+                                </div>
+                            @endif
+                        </td>
 
-                            </form>
+                        <td>
+                            <strong>{{ $product->name }}</strong>
+                            <br>
+                            <small style="color: #6b7280;">Added by: {{ $product->created_by ?? 'Admin' }}</small>
+                        </td>
 
-                        </div>
+                        <td>
+                            <span style="background: #ede9fe; color: #6d28d9; padding: 4px 10px; border-radius: 12px; font-weight: bold; font-size: 13px;">
+                                {{ $product->category->name ?? 'Uncategorized' }}
+                            </span>
+                        </td>
 
-                    </td>
+                        <td>
+                            @if ($product->qty <= 5)
+                                <span class="stock-danger">Low: {{ $product->qty }}</span>
+                            @else
+                                <span style="font-weight: bold; color: #27ae60;">{{ $product->qty }}</span>
+                            @endif
+                        </td>
 
-                </tr>
+                        <td>
+                            <strong>৳{{ number_format($product->price, 2) }}</strong>
+                        </td>
 
-            @empty
+                        <td>
+                            <small style="color: #4b5563;">
+                                {{ Str::limit($product->description ?: 'No description provided', 50) }}
+                            </small>
+                        </td>
 
-                <tr>
-                    <td
-                        colspan="7"
-                        class="empty-message"
-                    >
-                        No products found.
-                    </td>
-                </tr>
+                        <td>
 
-            @endforelse
+                            <div class="action-buttons">
 
-        </tbody>
+                                {{-- Edit --}}
+                                <a
+                                    class="edit-button"
+                                    href="{{ route('product.edit', $product) }}"
+                                >
+                                    Edit
+                                </a>
 
-    </table>
+                                {{-- Delete --}}
+                                <form
+                                    class="delete-form"
+                                    method="POST"
+                                    action="{{ route('product.destroy', $product) }}"
+                                    onsubmit="return confirm('Are you sure you want to delete this product?');"
+                                >
+                                    @csrf
+                                    @method('DELETE')
 
-</div>
+                                    <button
+                                        class="delete-button"
+                                        type="submit"
+                                    >
+                                        Delete
+                                    </button>
+                                </form>
 
-{{-- Back to Categories --}}
-<a
-    class="back-link"
-    href="{{ route('category.index') }}"
->
-    ← Back to Categories
-</a>
- 
+                            </div>
+
+                        </td>
+
+                    </tr>
+
+                @empty
+
+                    <tr>
+                        <td
+                            colspan="7"
+                            class="empty-message"
+                        >
+                            No products found in inventory.
+                        </td>
+                    </tr>
+
+                @endforelse
+
+            </tbody>
+
+        </table>
+
+    </div>
 
 </div>
 

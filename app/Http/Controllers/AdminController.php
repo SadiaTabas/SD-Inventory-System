@@ -5,38 +5,52 @@ namespace App\Http\Controllers;
 use App\Models\User;
 use App\Models\Product;
 use App\Models\Category;
+use App\Models\Order;
+use App\Models\DeliveryAgent;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
 {
     // Admin Dashboard
     public function dashboard()
-{
-    $totalProducts = Product::count();
+    {
+        $totalProducts = Product::count();
+        $totalCategories = Category::count();
+        $totalCustomers = User::where('role', 'customer')->count();
+        $totalAdmins = User::where('role', 'admin')->count();
+        $totalOrders = Order::count();
+        $pendingOrders = Order::where('status', 'pending')->count();
+        $totalAgents = DeliveryAgent::count();
 
-    $totalCategories = Category::count();
+        $lowStockProducts = Product::where('qty', '<=', 5)
+            ->orderBy('qty', 'asc')
+            ->get();
 
-    $totalCustomers = User::where('role', 'customer')->count();
+        $recentProducts = Product::latest()
+            ->take(5)
+            ->get();
 
-    $totalAdmins = User::where('role', 'admin')->count();
+        $recentOrders = Order::with('customer')
+            ->latest()
+            ->take(5)
+            ->get();
 
-    $lowStockProducts = Product::where('qty', '<=', 5)
-        ->orderBy('qty', 'asc')
-        ->get();
+        return view('admin.dashboard', compact(
+            'totalProducts',
+            'totalCategories',
+            'totalCustomers',
+            'totalAdmins',
+            'totalOrders',
+            'pendingOrders',
+            'totalAgents',
+            'lowStockProducts',
+            'recentProducts',
+            'recentOrders'
+        ));
+    }
 
-    $recentProducts = Product::latest()
-        ->take(5)
-        ->get();
-
-    return view('admin.dashboard', compact(
-        'totalProducts',
-        'totalCategories',
-        'totalCustomers',
-        'totalAdmins',
-        'lowStockProducts',
-        'recentProducts'
-    ));
-}
     // Show all admins
     public function index()
     {
@@ -59,6 +73,10 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email',
+
+            // Phone must be exactly 11 digits
+            'phone' => 'required|digits:11',
+
             'password' => [
                 'required',
                 'confirmed',
@@ -73,8 +91,11 @@ class AdminController extends Controller
         User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'password' => bcrypt($request->password),
+            'phone' => $request->phone,
+            'password' => Hash::make($request->password),
             'role' => 'admin',
+            'status' => 1,
+            'created_by' => Auth::user()->name ?? 'System',
         ]);
 
         return redirect()
@@ -102,12 +123,35 @@ class AdminController extends Controller
         $request->validate([
             'name' => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $admin->id,
+
+            // Phone must be exactly 11 digits
+            'phone' => 'required|digits:11',
+
+            'status' => 'required|in:0,1',
+            'password' => [
+                'nullable',
+                'confirmed',
+                'min:8',
+                'regex:/[A-Z]/',
+                'regex:/[a-z]/',
+                'regex:/[0-9]/',
+                'regex:/[@$!%*?&#]/',
+            ],
         ]);
 
-        $admin->update([
+        $data = [
             'name' => $request->name,
             'email' => $request->email,
-        ]);
+            'phone' => $request->phone,
+            'status' => $request->status,
+            'updated_by' => Auth::user()->name ?? 'System',
+        ];
+
+        if ($request->filled('password')) {
+            $data['password'] = Hash::make($request->password);
+        }
+
+        $admin->update($data);
 
         return redirect()
             ->route('admin.index')
@@ -121,8 +165,8 @@ class AdminController extends Controller
             abort(404);
         }
 
-        // Prevent admin from deleting themselves
-        if ($admin->id === auth()->id) {
+       
+        if ($admin->id === Auth::id()) {
             return redirect()
                 ->route('admin.index')
                 ->with('error', 'You cannot delete your own account.');

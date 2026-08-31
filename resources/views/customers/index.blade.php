@@ -6,152 +6,136 @@
 
 <div class="container">
 
- 
-<h1>Customer Management</h1>
+    <h1>Customer Management</h1>
 
-{{-- Success Message --}}
-@if (session('success'))
-    <div class="success-message">
-        {{ session('success') }}
+    @if (session('success'))
+        <div class="success-message">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    <div class="top-actions">
+        <a
+            class="create-button"
+            href="{{ route('customer.create') }}"
+        >
+            + Create New Customer
+        </a>
     </div>
-@endif
 
-{{-- Create Customer --}}
-<a
-    class="create-button"
-    href="{{ route('customer.create') }}"
->
-    + Create New Customer
-</a>
+    <div class="table-container">
 
-<div class="table-container">
+        <table>
 
-    <table>
-
-        <thead>
-            <tr>
-                <th>ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>City</th>
-                <th>Status</th>
-                <th>Actions</th>
-            </tr>
-        </thead>
-
-        <tbody>
-
-            @forelse ($customers as $customer)
-
+            <thead>
                 <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>City</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
 
-                    <td class="id">
-                        {{ $customer->id }}
-                    </td>
+            <tbody>
 
-                    <td>
-                        <strong>{{ $customer->name }}</strong>
-                    </td>
+                @forelse ($customers as $customer)
 
-                    <td>
-                        {{ $customer->email }}
-                    </td>
+                    @php
+                        $primaryAddr = $customer->addresses->firstWhere('is_default', 1) ?? $customer->addresses->first();
+                    @endphp
 
-                    <td>
-                        {{ $customer->phone }}
-                    </td>
+                    <tr>
 
-                    <td>
-                        {{ $customer->city ?: 'N/A' }}
-                    </td>
+                        <td class="id">
+                            {{ $customer->id }}
+                        </td>
 
-                    <td>
+                        <td>
+                            <strong>{{ $customer->name }}</strong>
+                        </td>
 
-                        @if ($customer->status)
+                        <td>
+                            {{ $customer->email }}
+                        </td>
 
-                            <span class="status active">
-                                Active
-                            </span>
+                        <td>
+                            {{ $customer->phone ?: 'N/A' }}
+                        </td>
 
-                        @else
+                        <td>
+                            {{ $primaryAddr->city ?? 'N/A' }}
+                        </td>
 
-                            <span class="status inactive">
-                                Inactive
-                            </span>
+                        <td>
+                            @if ($customer->status)
+                                <span class="status active">Active</span>
+                            @else
+                                <span class="status inactive">Inactive</span>
+                            @endif
+                        </td>
 
-                        @endif
+                        <td>
 
-                    </td>
+                            <div class="action-buttons">
 
-                    <td>
-
-                        <div class="action-buttons">
-
-                            {{-- View --}}
-                            <a
-                                class="create-button"
-                                href="{{ route('customer.show', $customer) }}"
-                                style="margin: 0; padding: 8px 14px; background-color: #3498db;"
-                            >
-                                View
-                            </a>
-
-                            {{-- Edit --}}
-                            <a
-                                class="edit-button"
-                                href="{{ route('customer.edit', $customer) }}"
-                            >
-                                Edit
-                            </a>
-
-                            {{-- Delete --}}
-                            <form
-                                class="delete-form"
-                                method="POST"
-                                action="{{ route('customer.destroy', $customer) }}"
-                                onsubmit="return confirm('Are you sure you want to delete this customer?');"
-                            >
-
-                                @csrf
-                                @method('DELETE')
-
-                                <button
-                                    class="delete-button"
-                                    type="submit"
+                                <a
+                                    class="view-button"
+                                    href="{{ route('customer.show', $customer) }}"
                                 >
-                                    Delete
-                                </button>
+                                    View
+                                </a>
 
-                            </form>
+                                <a
+                                    class="edit-button"
+                                    href="{{ route('customer.edit', $customer) }}"
+                                >
+                                    Edit
+                                </a>
 
-                        </div>
+                                <form
+                                    class="delete-form"
+                                    method="POST"
+                                    action="{{ route('customer.destroy', $customer) }}"
+                                    onsubmit="return confirm('Are you sure you want to delete this customer?');"
+                                >
+                                    @csrf
+                                    @method('DELETE')
 
-                    </td>
+                                    <button
+                                        class="delete-button"
+                                        type="submit"
+                                    >
+                                        Delete
+                                    </button>
+                                </form>
 
-                </tr>
+                            </div>
 
-            @empty
+                        </td>
 
-                <tr>
+                    </tr>
 
-                    <td
-                        colspan="7"
-                        class="empty-message"
-                    >
-                        No customers found.
-                    </td>
+                @empty
 
-                </tr>
+                    <tr>
+                        <td
+                            colspan="7"
+                            class="empty-message"
+                        >
+                            No customers found.
+                        </td>
+                    </tr>
 
-            @endforelse
+                @endforelse
 
-        </tbody>
+            </tbody>
 
-    </table>
+        </table>
 
-</div>
- 
+    </div>
 
 </div>
 

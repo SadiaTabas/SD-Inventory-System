@@ -1,37 +1,42 @@
 <nav class="navbar">
 
- 
-<div class="nav-container">
+    <div class="nav-container">
 
-    <a href="{{ route('product.index') }}" class="logo">
-        SD Inventory System
-    </a>
-
-    <div class="nav-links">
-        
-        <a href="{{ route('customer.index') }}">
-    Customers
-</a>
-
-        <a href="{{ route('product.index') }}">
-            Products
+        <a href="{{ route('admin.dashboard') }}" class="logo">
+            SD Inventory System
         </a>
 
-        <a href="{{ route('category.index') }}">
-            Categories
-        </a>
+        <div class="nav-links">
+            
+            <a href="{{ route('admin.dashboard') }}">
+                Dashboard
+            </a>
 
-        <form method="POST" action="{{ route('logout') }}">
-            @csrf
+            <a href="{{ route('order.index') }}">
+                Orders
+            </a>
 
-            <button type="submit" class="logout-btn">
-                Logout
-            </button>
-        </form>
+            <a href="{{ route('customer.index') }}">
+                Customers
+            </a>
+
+            <a href="{{ route('product.index') }}">
+                Products
+            </a>
+
+            <a href="{{ route('category.index') }}">
+                Categories
+            </a>
+
+            <form method="POST" action="{{ route('logout') }}" class="logout-form">
+                @csrf
+                <button type="submit" class="logout-btn">
+                    Logout
+                </button>
+            </form>
+
+        </div>
 
     </div>
-
-</div>
- 
 
 </nav>
