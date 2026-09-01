@@ -33,6 +33,8 @@
                     <th>Customer</th>
                     <th>Rider</th>
                     <th>Total</th>
+                    <th>Paid</th>
+                    <th>Due</th>
                     <th>Payment</th>
                     <th>Delivery Status</th>
                     <th>Actions</th>
@@ -47,12 +49,14 @@
 
                         <td>
                             <strong>{{ $order->order_number ?? ('#' . $order->id) }}</strong>
+                            <br>
+                            <small class="text-muted">{{ $order->created_at->format('d M Y, h:i A') }}</small>
                         </td>
 
                         <td>
-                            <strong>{{ $order->customer->name ?? 'User Deleted' }}</strong>
+                            <strong>{{ $order->user->name ?? ($order->customer->name ?? 'User Deleted') }}</strong>
                             <br>
-                            <small>{{ $order->customer->phone ?? '' }}</small>
+                            <small>{{ $order->user->phone ?? ($order->customer->phone ?? '') }}</small>
                         </td>
 
                         <td>
@@ -60,12 +64,27 @@
                         </td>
 
                         <td>
-                            ৳{{ number_format($order->total_amount, 2) }}
+                            <strong>৳{{ number_format($order->total_amount, 2) }}</strong>
+                            @if (($order->discount_amount ?? 0) > 0)
+                                <br><small style="color: #e74c3c;">(-৳{{ number_format($order->discount_amount, 2) }})</small>
+                            @endif
+                        </td>
+
+                        <td>
+                            <strong style="color: #27ae60;">৳{{ number_format($order->paid_amount ?? 0, 2) }}</strong>
+                        </td>
+
+                        <td>
+                            @if (($order->due_amount ?? 0) > 0)
+                                <strong style="color: #e74c3c;">৳{{ number_format($order->due_amount, 2) }}</strong>
+                            @else
+                                <span style="color: #27ae60; font-weight: bold;">৳0.00</span>
+                            @endif
                         </td>
 
                         <td>
                             <span class="status {{ $order->payment_status === 'paid' ? 'active' : 'inactive' }}">
-                                {{ ucfirst($order->payment_status) }}
+                                {{ ucfirst(str_replace('_', ' ', $order->payment_status)) }}
                             </span>
                             <br>
                             <small>{{ strtoupper($order->payment_method ?? 'COD') }}</small>
@@ -79,13 +98,22 @@
 
                         <td>
 
-                            <div class="action-buttons">
+                            <div class="action-buttons" style="display: flex; gap: 6px; align-items: center;">
 
                                 <a
                                     class="view-button"
                                     href="{{ route('order.show', $order) }}"
                                 >
                                     View
+                                </a>
+
+                                <a
+                                    class="view-button"
+                                    href="{{ route('order.invoice', $order) }}"
+                                    style="background-color: #27ae60;"
+                                    title="Download PDF Invoice"
+                                >
+                                    PDF
                                 </a>
 
                                 <a
@@ -121,7 +149,7 @@
                 @empty
 
                     <tr>
-                        <td colspan="7" class="empty-message">
+                        <td colspan="9" class="empty-message" style="text-align: center; padding: 20px;">
                             No orders found.
                         </td>
                     </tr>

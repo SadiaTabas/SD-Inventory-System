@@ -27,6 +27,7 @@
             <a href="{{ route('category.index') }}">
                 Categories
             </a>
+            <a href="{{ route('coupons.index') }}" > Manage Coupons </a>
 
             <form method="POST" action="{{ route('logout') }}" class="logout-form">
                 @csrf

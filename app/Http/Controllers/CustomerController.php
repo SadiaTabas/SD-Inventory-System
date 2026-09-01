@@ -11,8 +11,8 @@ use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
-    /**
-     * Display customers.
+    /*
+      Display customers.
      */
     public function index()
     {
@@ -26,8 +26,8 @@ class CustomerController extends Controller
         ]);
     }
 
-    /**
-     * Show create form.
+    /*
+     Show create form.
      */
     public function create()
     {

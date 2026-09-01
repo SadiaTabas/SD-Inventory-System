@@ -169,7 +169,7 @@
     
     <div class="quick-actions">
 
-        <h2>Quick Actions</h2>
+        <h2>Inquiry</h2>
 
         <div class="actions-grid">
 
@@ -204,6 +204,14 @@
                     <p>View and manage system administrators</p>
                 </div>
             </a>
+
+            <a href="{{ route('coupons.index') }}" class="action-card">
+    <span>🏷️</span>
+    <div>
+        <h3>Manage Coupons</h3>
+        <p>Create and manage promo discount offers</p>
+    </div>
+</a>
 
         </div>
 

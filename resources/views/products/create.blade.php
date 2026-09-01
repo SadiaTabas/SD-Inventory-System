@@ -4,6 +4,26 @@
 
 @section('content')
 
+ 
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
+<style>
+    .ts-control {
+        border-radius: 6px !important;
+        padding: 10px 12px !important;
+        border: 1px solid #cbd5e1 !important;
+        font-size: 14px !important;
+    }
+    .ts-dropdown {
+        border-radius: 6px !important;
+        border: 1px solid #cbd5e1 !important;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+    }
+    .ts-dropdown .active {
+        background-color: #3b82f6 !important;
+        color: white !important;
+    }
+</style>
+
 <div class="container">
 
     <h1>Create New Product</h1>
@@ -26,7 +46,7 @@
     >
         @csrf
 
-         
+        
         <div class="form-group">
             <label for="name">Product Name</label>
             <input
@@ -45,6 +65,7 @@
             <select
                 id="category_id"
                 name="category_id"
+                placeholder="Search or select category..."
                 required
             >
                 <option value="">Select Category</option>
@@ -70,7 +91,7 @@
             >
         </div>
 
-         
+        
         <div class="form-group">
             <label for="qty">Quantity</label>
             <input
@@ -99,7 +120,7 @@
             >
         </div>
 
-         
+        
         <div class="form-group">
             <label for="description">Description</label>
             <textarea
@@ -109,7 +130,7 @@
             >{{ old('description') }}</textarea>
         </div>
 
-         
+        
         <button
             type="submit"
             class="primary-button"
@@ -127,5 +148,18 @@
     </a>
 
 </div>
+ 
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    new TomSelect('#category_id', {
+        create: false,
+        sortField: {
+            field: "text",
+            direction: "asc"
+        }
+    });
+});
+</script>
 
 @endsection

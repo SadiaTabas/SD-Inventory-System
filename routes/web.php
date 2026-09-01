@@ -12,6 +12,9 @@ use App\Http\Controllers\Auth\RegisterController;
 use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
+use App\Http\Controllers\CouponController;
+
+
 
 // Home
 Route::get('/', function () {
@@ -71,6 +74,13 @@ Route::middleware('auth')->group(function () {
 
         // Admins
         Route::resource('admin', AdminController::class);
+        Route::get('/orders/{order}/invoice', [OrderController::class, 'downloadInvoice'])->name('order.invoice');
+ 
+
+Route::resource('coupons', CouponController::class);
+Route::post('/orders/{order}/payments', [OrderController::class, 'addPayment'])->name('order.payments.store');
+
+
     });
 
     // Customer Group
