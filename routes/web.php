@@ -79,7 +79,8 @@ Route::middleware('auth')->group(function () {
 
 Route::resource('coupons', CouponController::class);
 Route::post('/orders/{order}/payments', [OrderController::class, 'addPayment'])->name('order.payments.store');
-
+Route::get('/products/import', [ProductController::class, 'showImportForm'])->name('product.import.form');
+Route::post('/products/import', [ProductController::class, 'import'])->name('product.import');
 
     });
 

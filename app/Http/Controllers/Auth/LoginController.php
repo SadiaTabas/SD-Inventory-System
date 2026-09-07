@@ -26,7 +26,9 @@ class LoginController extends Controller
             'status' => 1, // Ensures only active accounts can log in
         ];
 
-        if (Auth::attempt($credentials, $request->filled('remember'))) {
+        $remember = $request->boolean('remember');
+
+        if (Auth::attempt($credentials, $remember)) {
             $request->session()->regenerate();
 
             // Redirect based on user role

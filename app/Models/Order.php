@@ -36,6 +36,7 @@ class Order extends Model
         'delivery_man_name',
         'delivery_man_phone',
         'delivery_notes',
+        'delivery_charge'
     ];
 
     /*

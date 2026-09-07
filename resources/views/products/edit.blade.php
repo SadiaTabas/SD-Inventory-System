@@ -97,7 +97,7 @@
 
        
         <div class="form-group">
-            <label for="price">Price (৳)</label>
+            <label for="price">Price (BDT)</label>
             <input
                 type="number"
                 id="price"

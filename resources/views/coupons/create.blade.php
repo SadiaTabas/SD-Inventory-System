@@ -43,14 +43,14 @@
         <div class="form-group">
             <label for="type">Discount Type</label>
             <select id="type" name="type" required onchange="updateValueLabel(this.value)">
-                <option value="fixed" {{ old('type') == 'fixed' ? 'selected' : '' }}>Fixed Amount (৳)</option>
+                <option value="fixed" {{ old('type') == 'fixed' ? 'selected' : '' }}>Fixed Amount (BDT)</option>
                 <option value="percent" {{ old('type') == 'percent' ? 'selected' : '' }}>Percentage (%)</option>
             </select>
         </div>
 
         {{-- Discount Value --}}
         <div class="form-group">
-            <label for="value" id="value-label">Discount Value (৳)</label>
+            <label for="value" id="value-label">Discount Value (BDT)</label>
             <input
                 type="number"
                 step="0.01"
@@ -65,7 +65,7 @@
 
         {{-- Minimum Order Amount --}}
         <div class="form-group">
-            <label for="min_order_amount">Minimum Order Amount (৳)</label>
+            <label for="min_order_amount">Minimum Order Amount (BDT)</label>
             <input
                 type="number"
                 step="0.01"
@@ -110,7 +110,7 @@ function updateValueLabel(type) {
     if (type === 'percent') {
         label.innerText = 'Discount Value (%)';
     } else {
-        label.innerText = 'Discount Value (৳)';
+        label.innerText = 'Discount Value (BDT)';
     }
 }
 </script>

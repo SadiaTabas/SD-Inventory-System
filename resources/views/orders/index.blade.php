@@ -64,21 +64,21 @@
                         </td>
 
                         <td>
-                            <strong>৳{{ number_format($order->total_amount, 2) }}</strong>
+                            <strong>BDT{{ number_format($order->total_amount, 2) }}</strong>
                             @if (($order->discount_amount ?? 0) > 0)
-                                <br><small style="color: #e74c3c;">(-৳{{ number_format($order->discount_amount, 2) }})</small>
+                                <br><small style="color: #e74c3c;">(-BDT{{ number_format($order->discount_amount, 2) }})</small>
                             @endif
                         </td>
 
                         <td>
-                            <strong style="color: #27ae60;">৳{{ number_format($order->paid_amount ?? 0, 2) }}</strong>
+                            <strong style="color: #27ae60;">BDT{{ number_format($order->paid_amount ?? 0, 2) }}</strong>
                         </td>
 
                         <td>
                             @if (($order->due_amount ?? 0) > 0)
-                                <strong style="color: #e74c3c;">৳{{ number_format($order->due_amount, 2) }}</strong>
+                                <strong style="color: #e74c3c;">BDT{{ number_format($order->due_amount, 2) }}</strong>
                             @else
-                                <span style="color: #27ae60; font-weight: bold;">৳0.00</span>
+                                <span style="color: #27ae60; font-weight: bold;">BDT0.00</span>
                             @endif
                         </td>
 

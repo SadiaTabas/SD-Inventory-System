@@ -40,6 +40,23 @@
 
     {{-- Order Financial Quick Info --}}
     <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+        @php
+            $deliveryCharge = (float) (
+                $order->delivery_charge 
+                ?? ($order->total_amount - ($order->subtotal_amount ?? 0) + ($order->discount_amount ?? 0))
+            );
+            if ($deliveryCharge <= 0 && ((float)$order->total_amount > (float)($order->subtotal_amount ?? 0))) {
+                $deliveryCharge = (float)$order->total_amount - (float)($order->subtotal_amount ?? 0) + (float)($order->discount_amount ?? 0);
+            }
+        @endphp
+
+        @if ($deliveryCharge > 0)
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #0284c7;">
+                <span>Delivery Charge:</span>
+                <strong>+ ৳{{ number_format($deliveryCharge, 2) }}</strong>
+            </div>
+        @endif
+
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
             <span>Grand Total:</span>
             <strong>৳{{ number_format($order->total_amount, 2) }}</strong>

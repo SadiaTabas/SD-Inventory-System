@@ -65,7 +65,7 @@
                 🚚
             </div>
             <div class="stat-info">
-                <p>Pending Orders</p>
+                <p>Pending Orders Status</p>
                 <h2>{{ $pendingOrders }}</h2>
             </div>
         </div>
@@ -150,7 +150,7 @@
                                 <p>{{ $order->customer->name ?? 'User' }} &bull; {{ ucfirst($order->delivery_status) }}</p>
                             </div>
                             <div class="product-price">
-                                ৳{{ number_format($order->total_amount, 2) }}
+                                BDT{{ number_format($order->total_amount, 2) }}
                             </div>
                         </div>
                     @endforeach

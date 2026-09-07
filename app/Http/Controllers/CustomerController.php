@@ -35,40 +35,93 @@ class CustomerController extends Controller
     }
 
     /*
-     Store customer.
+     Store customer (Supports both batch dynamic rows and single submission fallback).
      */
     public function store(Request $request)
     {
+        $creatorName = Auth::user()->name ?? 'Admin';
+
+        // 1. Dynamic Array Submission
+        if ($request->has('customers') && is_array($request->customers)) {
+            $request->validate([
+                'customers'               => 'required|array|min:1',
+                'customers.*.name'        => 'required|string|max:255',
+                'customers.*.email'       => 'required|email|distinct|unique:users,email',
+                'customers.*.phone'       => 'nullable|string|digits:11',
+                'customers.*.address'     => 'nullable|string',
+                'customers.*.city'        => 'nullable|string|max:100',
+                'customers.*.status'      => 'required|in:0,1',
+            ], [
+                'customers.*.email.distinct' => 'Each customer in the list must have a distinct email address.',
+                'customers.*.email.unique'   => 'One or more of the emails have already been taken.',
+                'customers.*.phone.digits'   => 'Phone number should be 11 digits.',
+            ]);
+
+            DB::transaction(function () use ($request, $creatorName) {
+                foreach ($request->customers as $item) {
+                    $customer = User::create([
+                        'name'       => $item['name'],
+                        'email'      => $item['email'],
+                        'phone'      => $item['phone'] ?? null,
+                        'password'   => Hash::make('password123'),
+                        'role'       => 'customer',
+                        'status'     => (bool) $item['status'],
+                        'created_by' => $creatorName,
+                    ]);
+
+                    if (!empty($item['address'])) {
+                        Address::create([
+                            'user_id'             => $customer->id,
+                            'title'               => 'Primary',
+                            'contact_person_name' => $item['name'],
+                            'contact_phone'       => $item['phone'] ?? null,
+                            'address'             => $item['address'],
+                            'city'                => !empty($item['city']) ? $item['city'] : 'Dhaka',
+                            'is_default'          => 1,
+                        ]);
+                    }
+                }
+            });
+
+            return redirect()
+                ->route('customer.index')
+                ->with('success', 'Customers created successfully.');
+        }
+
+        // 2. Single Customer Fallback
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email',
-            'phone' => 'nullable|string|max:50',
+            'name'     => 'required|string|max:255',
+            'email'    => 'required|email|unique:users,email',
+            'phone'    => 'nullable|string|digits:11',
             'password' => 'nullable|string|min:6',
-            'address' => 'nullable|string',
-            'city' => 'nullable|string|max:100',
-            'status' => 'required|boolean',
+            'address'  => 'nullable|string',
+            'city'     => 'nullable|string|max:100',
+            'status'   => 'required|boolean',
+        ], [
+            'email.unique' => 'This email has already been taken.',
+            'phone.digits' => 'Phone number should be 11 digits.',
         ]);
 
-        DB::transaction(function () use ($request) {
+        DB::transaction(function () use ($request, $creatorName) {
             $customer = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'password' => Hash::make($request->password ?? 'password123'),
-                'role' => 'customer',
-                'status' => $request->status,
-                'created_by' => Auth::user()->name ?? 'Admin',
+                'name'       => $request->name,
+                'email'      => $request->email,
+                'phone'      => $request->phone,
+                'password'   => Hash::make($request->password ?? 'password123'),
+                'role'       => 'customer',
+                'status'     => $request->status,
+                'created_by' => $creatorName,
             ]);
 
             if ($request->filled('address')) {
                 Address::create([
-                    'user_id' => $customer->id,
-                    'title' => 'Primary',
+                    'user_id'             => $customer->id,
+                    'title'               => 'Primary',
                     'contact_person_name' => $request->name,
-                    'contact_phone' => $request->phone,
-                    'address' => $request->address,
-                    'city' => $request->city ?? 'Dhaka',
-                    'is_default' => 1,
+                    'contact_phone'       => $request->phone,
+                    'address'             => $request->address,
+                    'city'                => $request->city ?? 'Dhaka',
+                    'is_default'          => 1,
                 ]);
             }
         });
@@ -120,20 +173,23 @@ class CustomerController extends Controller
         }
 
         $request->validate([
-            'name' => 'required|string|max:255',
-            'email' => 'required|email|unique:users,email,' . $customer->id,
-            'phone' => 'nullable|string|max:50',
-            'status' => 'required|boolean',
+            'name'    => 'required|string|max:255',
+            'email'   => 'required|email|unique:users,email,' . $customer->id,
+            'phone'   => 'nullable|string|digits:11',
+            'status'  => 'required|boolean',
             'address' => 'nullable|string',
-            'city' => 'nullable|string|max:100',
+            'city'    => 'nullable|string|max:100',
+        ], [
+            'email.unique' => 'This email has already been taken.',
+            'phone.digits' => 'Phone number should be 11 digits.',
         ]);
 
         DB::transaction(function () use ($request, $customer) {
             $customer->update([
-                'name' => $request->name,
-                'email' => $request->email,
-                'phone' => $request->phone,
-                'status' => $request->status,
+                'name'       => $request->name,
+                'email'      => $request->email,
+                'phone'      => $request->phone,
+                'status'     => $request->status,
                 'updated_by' => Auth::user()->name ?? 'Admin',
             ]);
 
@@ -141,11 +197,11 @@ class CustomerController extends Controller
                 Address::updateOrCreate(
                     ['user_id' => $customer->id, 'is_default' => 1],
                     [
-                        'title' => 'Primary',
+                        'title'               => 'Primary',
                         'contact_person_name' => $request->name,
-                        'contact_phone' => $request->phone,
-                        'address' => $request->address,
-                        'city' => $request->city ?? 'Dhaka',
+                        'contact_phone'       => $request->phone,
+                        'address'             => $request->address,
+                        'city'                => $request->city ?? 'Dhaka',
                     ]
                 );
             }
@@ -157,7 +213,7 @@ class CustomerController extends Controller
     }
 
     /*
-     * Delete customer.
+     Delete customer.
      */
     public function destroy(User $customer)
     {

@@ -32,6 +32,27 @@
             margin-bottom: 15px;
         }
 
+        .remember-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 18px;
+        }
+
+        .remember-group input[type="checkbox"] {
+            width: auto;
+            margin: 0;
+            cursor: pointer;
+        }
+
+        .remember-group label {
+            display: inline;
+            margin-bottom: 0;
+            cursor: pointer;
+            font-size: 14px;
+            color: #555;
+        }
+
         label {
             display: block;
             margin-bottom: 5px;
@@ -116,6 +137,17 @@
                 placeholder="Enter your password"
                 required
             >
+        </div>
+
+        <div class="remember-group">
+            <input
+                type="checkbox"
+                name="remember"
+                id="remember"
+                value="1"
+                {{ old('remember') ? 'checked' : '' }}
+            >
+            <label for="remember">Remember Me</label>
         </div>
 
         <button type="submit">

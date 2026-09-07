@@ -44,16 +44,18 @@ class OrderController extends Controller
         $isAdmin = $authUser && $authUser->role === 'admin';
 
         $rules = [
-            'product_id'        => 'required|exists:products,id',
-            'quantity'          => 'required|integer|min:1',
-            'shipping_address'  => 'required|string',
-            'payment_method'    => 'nullable|string',
-            'delivery_agent_id' => 'nullable|exists:delivery_agents,id',
-            'delivery_slot'     => 'nullable|string',
-            'delivery_notes'    => 'nullable|string',
-            'coupon_id'         => 'nullable|exists:coupons,id',
-            'advance_payment'   => 'nullable|numeric|min:0',
-            'transaction_id'    => 'nullable|string|max:100',
+            'items'               => 'required|array|min:1',
+            'items.*.product_id'  => 'required|exists:products,id',
+            'items.*.quantity'    => 'required|integer|min:1',
+            'shipping_address'    => 'required|string',
+            'delivery_charge'     => 'required|numeric|min:0',
+            'payment_method'      => 'nullable|string',
+            'delivery_agent_id'   => 'nullable|exists:delivery_agents,id',
+            'delivery_slot'       => 'nullable|string',
+            'delivery_notes'      => 'nullable|string',
+            'coupon_id'           => 'nullable|exists:coupons,id',
+            'advance_payment'     => 'nullable|numeric|min:0',
+            'transaction_id'      => 'nullable|string|max:100',
         ];
 
         if ($isAdmin) {
@@ -65,19 +67,34 @@ class OrderController extends Controller
         $targetUserId = $isAdmin ? $request->user_id : $authUser->id;
 
         DB::transaction(function () use ($request, $targetUserId, $isAdmin, $authUser) {
-            $product = Product::lockForUpdate()->findOrFail($request->product_id);
+            $subtotal = 0.00;
+            $itemsPayload = [];
 
-            if ($request->quantity > $product->qty) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
-                    'quantity' => 'Not enough product stock available. Only ' . $product->qty . ' left.',
-                ]);
+            // 1. Lock and check stock for each submitted product
+            foreach ($request->items as $item) {
+                $product = Product::lockForUpdate()->findOrFail($item['product_id']);
+
+                if ($item['quantity'] > $product->qty) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'items' => 'Not enough stock for ' . $product->name . '. Only ' . $product->qty . ' available.',
+                    ]);
+                }
+
+                $rowSubtotal = $product->price * $item['quantity'];
+                $subtotal += $rowSubtotal;
+
+                $itemsPayload[] = [
+                    'product'  => $product,
+                    'quantity' => $item['quantity'],
+                    'price'    => $product->price,
+                    'subtotal' => $rowSubtotal,
+                ];
             }
 
-            $subtotal = $product->price * $request->quantity;
             $discount = 0.00;
             $couponCode = null;
 
-            // Apply selected coupon discount
+            // 2. Apply coupon if valid
             if ($request->filled('coupon_id')) {
                 $coupon = Coupon::find($request->coupon_id);
                 if ($coupon && $subtotal >= $coupon->min_order_amount) {
@@ -88,11 +105,11 @@ class OrderController extends Controller
                 }
             }
 
-            // Ensure discount does not exceed subtotal
             $discount = min($discount, $subtotal);
-            $grandTotal = max(0, $subtotal - $discount);
+            $deliveryCharge = floatval($request->delivery_charge ?? 60.00);
+            $grandTotal = max(0, ($subtotal - $discount) + $deliveryCharge);
 
-            // Calculate advance payment and due balance
+            // 3. Calculate advance payment and due balance
             $advancePaid = floatval($request->advance_payment ?? 0.00);
             $advancePaid = min($advancePaid, $grandTotal);
             $dueAmount = max(0, $grandTotal - $advancePaid);
@@ -114,6 +131,7 @@ class OrderController extends Controller
                 }
             }
 
+            // 4. Create Master Order
             $order = Order::create([
                 'order_number'       => 'ORD-' . strtoupper(uniqid()),
                 'user_id'            => $targetUserId,
@@ -123,6 +141,7 @@ class OrderController extends Controller
                 'created_by'         => $authUser->name ?? 'System',
                 'subtotal_amount'    => $subtotal,
                 'discount_amount'    => $discount,
+                'delivery_charge'    => $deliveryCharge,
                 'coupon_code'        => $couponCode,
                 'total_amount'       => $grandTotal,
                 'paid_amount'        => $advancePaid,
@@ -138,15 +157,19 @@ class OrderController extends Controller
                 'delivery_notes'     => $request->delivery_notes,
             ]);
 
-            // Save order item
-            $order->items()->create([
-                'product_id' => $product->id,
-                'quantity'   => $request->quantity,
-                'price'      => $product->price,
-                'subtotal'   => $subtotal,
-            ]);
+            // 5. Attach each item and decrement quantity
+            foreach ($itemsPayload as $itemData) {
+                $order->items()->create([
+                    'product_id' => $itemData['product']->id,
+                    'quantity'   => $itemData['quantity'],
+                    'price'      => $itemData['price'],
+                    'subtotal'   => $itemData['subtotal'],
+                ]);
 
-            // Record initial/advance transaction if paid
+                $itemData['product']->decrement('qty', $itemData['quantity']);
+            }
+
+            // 6. Record Initial Payment Transaction if made
             if ($advancePaid > 0) {
                 $order->payments()->create([
                     'amount'         => $advancePaid,
@@ -157,8 +180,6 @@ class OrderController extends Controller
                     'recorded_by'    => $authUser->name ?? 'System',
                 ]);
             }
-
-            $product->decrement('qty', $request->quantity);
         });
 
         return redirect()

@@ -101,25 +101,41 @@
             
             <div style="border-top: 1px dashed #cbd5e1; margin-top: 12px; padding-top: 10px;">
 
-                <p><strong>Subtotal:</strong> ৳{{ number_format($order->subtotal_amount > 0 ? $order->subtotal_amount : $order->total_amount, 2) }}</p>
+                <p><strong>Subtotal:</strong> BDT{{ number_format($order->subtotal_amount > 0 ? $order->subtotal_amount : $order->total_amount, 2) }}</p>
 
                 @if (($order->discount_amount ?? 0) > 0)
                     <p style="color: #e74c3c;">
-                        <strong>Discount Applied:</strong> - ৳{{ number_format($order->discount_amount, 2) }}
+                        <strong>Discount Applied:</strong> - BDT{{ number_format($order->discount_amount, 2) }}
                         @if ($order->coupon_code)
                             <small>({{ $order->coupon_code }})</small>
                         @endif
                     </p>
                 @endif
 
-                <p><strong>Total Amount:</strong> <strong>৳{{ number_format($order->total_amount, 2) }}</strong></p>
+                @php
+                    $deliveryCharge = (float) (
+                        $order->delivery_charge 
+                        ?? ($order->total_amount - ($order->subtotal_amount ?? 0) + ($order->discount_amount ?? 0))
+                    );
+                    if ($deliveryCharge <= 0 && ((float)$order->total_amount > (float)($order->subtotal_amount ?? 0))) {
+                        $deliveryCharge = (float)$order->total_amount - (float)($order->subtotal_amount ?? 0) + (float)($order->discount_amount ?? 0);
+                    }
+                @endphp
+
+                @if ($deliveryCharge > 0)
+                    <p style="color: #0284c7;">
+                        <strong>Delivery Charge:</strong> + BDT{{ number_format($deliveryCharge, 2) }}
+                    </p>
+                @endif
+
+                <p><strong>Total Amount:</strong> <strong>BDT{{ number_format($order->total_amount, 2) }}</strong></p>
 
                 <p style="color: #27ae60;">
-                    <strong>Paid Amount:</strong> <strong>৳{{ number_format($order->paid_amount ?? 0, 2) }}</strong>
+                    <strong>Paid Amount:</strong> <strong>BDT{{ number_format($order->paid_amount ?? 0, 2) }}</strong>
                 </p>
 
                 <p style="color: #e74c3c; font-size: 16px;">
-                    <strong>Due Balance:</strong> <strong>৳{{ number_format($order->due_amount ?? 0, 2) }}</strong>
+                    <strong>Due Balance:</strong> <strong>BDT{{ number_format($order->due_amount ?? 0, 2) }}</strong>
                 </p>
 
             </div>
@@ -150,9 +166,9 @@
                         <td>
                             <strong>{{ $item->product->name ?? 'Product Removed' }}</strong>
                         </td>
-                        <td>৳{{ number_format($item->price, 2) }}</td>
+                        <td>BDT{{ number_format($item->price, 2) }}</td>
                         <td>{{ $item->quantity }}</td>
-                        <td>৳{{ number_format($item->subtotal, 2) }}</td>
+                        <td>BDT{{ number_format($item->subtotal, 2) }}</td>
                     </tr>
                 @empty
                     <tr>
@@ -281,7 +297,7 @@
             </div>
 
             <div class="form-group">
-                <label for="modal_transaction_id">Transaction ID / Reference (Optional)</label>
+                <label for="modal_transaction_id">Transaction ID  (Optional)</label>
                 <input
                     type="text"
                     id="modal_transaction_id"

@@ -47,10 +47,10 @@
                         <td>{{ ucfirst($coupon->type) }}</td>
                         <td>
                             <strong>
-                                {{ $coupon->type === 'percent' ? $coupon->value . '%' : '৳' . number_format($coupon->value, 2) }}
+                                {{ $coupon->type === 'percent' ? $coupon->value . '%' : 'BDT ' . number_format($coupon->value, 2) }}
                             </strong>
                         </td>
-                        <td>৳{{ number_format($coupon->min_order_amount, 2) }}</td>
+                        <td>BDT {{ number_format($coupon->min_order_amount, 2) }}</td>
                         <td>
                             <span class="status {{ $coupon->status ? 'active' : 'inactive' }}">
                                 {{ $coupon->status ? 'Active' : 'Inactive' }}

@@ -7,6 +7,8 @@ use App\Models\Product;
 use App\Models\Category;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
+use App\Imports\ProductsImport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class ProductController extends Controller
 {
@@ -116,6 +118,34 @@ class ProductController extends Controller
         return redirect()
             ->route('product.index')
             ->with('success', 'Product updated successfully.');
+    }
+    // Show upload form
+    public function showImportForm()
+    {
+        return view('products.import');
+    }
+
+    // Process uploaded .xlsx or .xls file
+   public function import(Request $request)
+    {
+        // Prevent timeout during large bulk image downloads
+        ini_set('max_execution_time', 600);
+        set_time_limit(600);
+        ini_set('memory_limit', '512M');
+
+        $request->validate([
+            'excel_file' => 'required|file|mimes:xlsx,xls,csv|max:20480',
+        ]);
+
+        try {
+            Excel::import(new ProductsImport, $request->file('excel_file'));
+
+            return redirect()
+                ->route('product.index')
+                ->with('success', 'Products and categories imported successfully.');
+        } catch (\Exception $e) {
+            return back()->with('error', 'Import error: ' . $e->getMessage());
+        }
     }
 
     // Delete product
