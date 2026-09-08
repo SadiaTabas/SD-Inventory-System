@@ -27,13 +27,13 @@
         
         <div style="display: flex; gap: 10px; align-items: center;">
 
-            @if (($order->due_amount ?? 0) > 0)
+           @if (($order->due_amount ?? 0) > 0)
                 <button
                     type="button"
                     onclick="openPaymentModal()"
                     style="background-color: #3b82f6; color: #fff; padding: 10px 16px; border-radius: 6px; border: none; font-size: 14px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; height: 38px; box-sizing: border-box; line-height: 1;"
                 >
-                    + Record Payment
+                    + {{ ($order->paid_amount ?? 0) > 0 ? 'Record Partial Payment' : 'Record Advance Payment' }}
                 </button>
             @endif
 
@@ -238,8 +238,8 @@
 >
     <div style="background: #fff; width: 100%; max-width: 480px; border-radius: 10px; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2);">
 
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-            <h3 style="margin: 0;">Record Partial Payment</h3>
+     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">{{ ($order->paid_amount ?? 0) > 0 ? 'Record Partial / Due Payment' : 'Record Advance Payment' }}</h3>
             <button
                 type="button"
                 onclick="closePaymentModal()"
@@ -250,7 +250,7 @@
         </div>
 
         <div style="background: #f8fafc; padding: 12px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e2e8f0;">
-            <span>Current Due:</span>
+            <span>{{ ($order->paid_amount ?? 0) > 0 ? 'Current Due:' : 'Remaining Amount:' }}</span>
             <strong style="color: #e74c3c; font-size: 16px;">৳{{ number_format($order->due_amount ?? 0, 2) }}</strong>
         </div>
 
@@ -306,13 +306,14 @@
                 >
             </div>
 
-            <div class="form-group">
+          <div class="form-group">
                 <label for="modal_note">Payment Note</label>
                 <input
                     type="text"
                     id="modal_note"
                     name="note"
-                    placeholder="e.g. 2nd Installment / Partial settlement"
+                    value="{{ ($order->paid_amount ?? 0) > 0 ? 'Partial Payment' : 'Advance / Initial Payment' }}"
+                    placeholder="e.g. Advance / Partial settlement"
                 >
             </div>
 

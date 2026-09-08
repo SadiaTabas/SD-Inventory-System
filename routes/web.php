@@ -13,8 +13,8 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\ForgotPasswordController;
 use App\Http\Controllers\Auth\ResetPasswordController;
 use App\Http\Controllers\CouponController;
-
-
+use Illuminate\Foundation\Auth\EmailVerificationRequest;
+use Illuminate\Http\Request;
 
 // Home
 Route::get('/', function () {
@@ -40,6 +40,9 @@ Route::post('/forgot-password', [ForgotPasswordController::class, 'sendResetLink
 // Reset Password
 Route::get('/reset-password/{token}', [ResetPasswordController::class, 'showResetForm'])->name('password.reset');
 Route::post('/reset-password', [ResetPasswordController::class, 'reset'])->name('password.update');
+
+// Public Admin Invitation Verification (Must be accessible without being logged in)
+Route::get('/admin/verify-invitation/{token}', [AdminController::class, 'verifyInvitation'])->name('admin.verify.invitation');
 
 // Protected Routes
 Route::middleware('auth')->group(function () {
@@ -75,13 +78,27 @@ Route::middleware('auth')->group(function () {
         // Admins
         Route::resource('admin', AdminController::class);
         Route::get('/orders/{order}/invoice', [OrderController::class, 'downloadInvoice'])->name('order.invoice');
- 
 
-Route::resource('coupons', CouponController::class);
-Route::post('/orders/{order}/payments', [OrderController::class, 'addPayment'])->name('order.payments.store');
-Route::get('/products/import', [ProductController::class, 'showImportForm'])->name('product.import.form');
-Route::post('/products/import', [ProductController::class, 'import'])->name('product.import');
+        Route::resource('coupons', CouponController::class);
+        Route::post('/orders/{order}/payments', [OrderController::class, 'addPayment'])->name('order.payments.store');
+        Route::get('/products/import', [ProductController::class, 'showImportForm'])->name('product.import.form');
+        Route::post('/products/import', [ProductController::class, 'import'])->name('product.import');
 
+        Route::get('/email/verify', function () {
+            return view('auth.verify-email');
+        })->name('verification.notice');
+
+        // Fulfill verification when admin clicks the link in Gmail
+        Route::get('/email/verify/{id}/{hash}', function (EmailVerificationRequest $request) {
+            $request->fulfill();
+            return redirect()->route('admin.dashboard')->with('success', 'Your email has been verified! Welcome to the admin dashboard.');
+        })->middleware('signed')->name('verification.verify');
+
+        // Resend verification link
+        Route::post('/email/verification-notification', function (Request $request) {
+            $request->user()->sendEmailVerificationNotification();
+            return back()->with('message', 'Verification link sent!');
+        })->middleware('throttle:6,1')->name('verification.send');
     });
 
     // Customer Group

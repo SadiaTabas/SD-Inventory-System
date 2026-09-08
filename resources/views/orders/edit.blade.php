@@ -4,7 +4,6 @@
 
 @section('content')
 
- 
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/css/tom-select.css" rel="stylesheet">
 <style>
     .ts-control {
@@ -22,11 +21,52 @@
         background-color: #3b82f6 !important;
         color: white !important;
     }
+    .product-row-item {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 8px;
+    }
+    .product-row-item select {
+        flex: 1 1 70%;
+        min-width: 0;
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        box-sizing: border-box;
+    }
+    .product-row-item input {
+        flex: 0 0 75px;
+        width: 75px;
+        padding: 8px;
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
+        box-sizing: border-box;
+    }
 </style>
 
 <div class="container">
 
-    <h1>Edit Order: {{ $order->order_number ?? ('#' . $order->id) }}</h1>
+    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; margin-bottom: 20px;">
+        <h1 style="margin: 0; font-size: 24px;">Edit Order: {{ $order->order_number ?? ('#' . $order->id) }}</h1>
+        <a href="{{ route('order.invoice', $order->id) }}" target="_blank" class="primary-button" style="text-decoration: none; padding: 10px 18px; width: auto; display: inline-block; white-space: nowrap; flex-shrink: 0;">
+            Download Updated Invoice
+        </a>
+    </div>
+
+    {{-- 2-Day Edit Window Status --}}
+    @if ($isEditable)
+        <div style="background: #e6fffa; border: 1px solid #38b2ac; color: #234e52; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+            You can modify products and quantities after order placement within 2 days. After this period, product modifications will be disabled.
+        </div>
+    @else
+        <div style="background: #fffaf0; border: 1px solid #dd6b20; color: #7b341e; padding: 12px; border-radius: 6px; margin-bottom: 15px;">
+            <strong>Modification Window Expired:</strong> Orders cannot have products changed after 2 days from order placement.
+        </div>
+    @endif
 
     @if ($errors->any())
         <div class="error-box">
@@ -53,21 +93,21 @@
         @if ($deliveryCharge > 0)
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #0284c7;">
                 <span>Delivery Charge:</span>
-                <strong>+ ৳{{ number_format($deliveryCharge, 2) }}</strong>
+                <strong>+ BDT {{ number_format($deliveryCharge, 2) }}</strong>
             </div>
         @endif
 
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
             <span>Grand Total:</span>
-            <strong>৳{{ number_format($order->total_amount, 2) }}</strong>
+            <strong>BDT {{ number_format($order->total_amount, 2) }}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; margin-bottom: 6px; color: #27ae60;">
             <span>Total Paid:</span>
-            <strong>৳{{ number_format($order->paid_amount ?? 0, 2) }}</strong>
+            <strong>BDT {{ number_format($order->paid_amount ?? 0, 2) }}</strong>
         </div>
         <div style="display: flex; justify-content: space-between; color: #e74c3c;">
             <span>Current Due:</span>
-            <strong>৳{{ number_format($order->due_amount ?? 0, 2) }}</strong>
+            <strong>BDT {{ number_format($order->due_amount ?? 0, 2) }}</strong>
         </div>
     </div>
 
@@ -75,9 +115,29 @@
         class="form-container"
         method="POST"
         action="{{ route('order.update', $order) }}"
+        style="box-sizing: border-box; width: 100%; max-width: 100%;"
     >
         @csrf
         @method('PUT')
+
+        {{-- Ordered Products Editing Section --}}
+        @if ($isEditable)
+            <div class="form-group" style="width: 100%; box-sizing: border-box;">
+                <label style="font-weight: 600; font-size: 15px; margin-bottom: 8px; display: block;">Order Products (Editable within 2 days)</label>
+                @foreach ($order->items as $index => $item)
+                    <div class="product-row-item">
+                        <select name="items[{{ $index }}][product_id]" required>
+                            @foreach ($products as $product)
+                                <option value="{{ $product->id }}" {{ $product->id == $item->product_id ? 'selected' : '' }}>
+                                    {{ $product->name }} (BDT {{ number_format($product->price, 2) }})
+                                </option>
+                            @endforeach
+                        </select>
+                        <input type="number" name="items[{{ $index }}][quantity]" value="{{ $item->quantity }}" min="1" required placeholder="Qty">
+                    </div>
+                @endforeach
+            </div>
+        @endif
 
         {{-- Order Status --}}
         <div class="form-group">
@@ -142,7 +202,6 @@
             </select>
         </div>
 
-        
         <div class="form-group">
             <label for="delivery_slot">Delivery Slot</label>
             <select id="delivery_slot" name="delivery_slot" placeholder="Search or select slot...">
@@ -202,11 +261,9 @@
 
 </div>
 
- 
 <script src="https://cdn.jsdelivr.net/npm/tom-select@2.2.2/dist/js/tom-select.complete.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    
     new TomSelect('#delivery_agent_id', {
         create: false
     });

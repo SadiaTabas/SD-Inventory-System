@@ -10,7 +10,11 @@
         "barryvdh/laravel-dompdf": "^3.1",
         "laravel/framework": "^13.17",
         "laravel/tinker": "^3.0",
-        "maatwebsite/excel": "4.0"
+        "maatwebsite/excel": "4.0",
+        "symfony/error-handler": "~7.4.0",
+        "symfony/http-foundation": "~7.4.0",
+        "symfony/http-kernel": "~7.4.0",
+        "symfony/var-dumper": "~7.4.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
@@ -81,6 +85,8 @@
         "allow-plugins": {
             "pestphp/pest-plugin": true,
             "php-http/discovery": true
+        },
+        "platform": {
         }
     },
     "minimum-stability": "stable",

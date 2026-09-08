@@ -205,7 +205,9 @@ class OrderController extends Controller
                 'payment_method' => $request->payment_method,
                 'transaction_id' => $request->transaction_id,
                 'payment_date'   => $request->payment_date,
-                'note'           => $request->note ?? 'Installment Payment',
+                'note'           => $request->filled('note') 
+                                        ? $request->note 
+                                        : (($order->paid_amount ?? 0) > 0 ? 'Installment Payment' : 'Advance Payment'),
                 'recorded_by'    => Auth::user()->name ?? 'System',
             ]);
 
@@ -236,15 +238,24 @@ class OrderController extends Controller
 
     public function edit(Order $order)
     {
+        // Check 2-day window (48 hours)
+        $hoursSinceCreation = $order->created_at->diffInHours(now());
+        $isEditable = ($hoursSinceCreation <= 48) && !in_array($order->status, ['delivered', 'cancelled']);
+
+        $order->load(['user', 'deliveryAgent', 'items.product', 'payments']);
         $customers = User::where('role', 'customer')->where('status', 1)->get();
         $deliveryAgents = DeliveryAgent::all();
+        $products = Product::all();
 
-        return view('orders.edit', compact('order', 'customers', 'deliveryAgents'));
+        return view('orders.edit', compact('order', 'customers', 'deliveryAgents', 'products', 'isEditable'));
     }
 
     public function update(Request $request, Order $order)
     {
-        $request->validate([
+        $hoursSinceCreation = $order->created_at->diffInHours(now());
+        $canEditProducts = ($hoursSinceCreation <= 48) && !in_array($order->status, ['delivered', 'cancelled']);
+
+        $rules = [
             'status'            => 'required|string',
             'payment_status'    => 'required|string',
             'payment_method'    => 'nullable|string',
@@ -253,47 +264,132 @@ class OrderController extends Controller
             'delivery_agent_id' => 'nullable|exists:delivery_agents,id',
             'delivery_slot'     => 'nullable|string',
             'delivery_notes'    => 'nullable|string',
-        ]);
+        ];
 
-        $agentName = $order->delivery_man_name;
-        $agentPhone = $order->delivery_man_phone;
-
-        if ($request->filled('delivery_agent_id') && $request->delivery_agent_id != $order->delivery_agent_id) {
-            $agent = DeliveryAgent::find($request->delivery_agent_id);
-            if ($agent) {
-                $agentName = $agent->name;
-                $agentPhone = $agent->phone;
+        if ($request->has('items') && is_array($request->items)) {
+            if (!$canEditProducts) {
+                return back()->withErrors([
+                    'items' => 'The 2-day (48-hour) window to modify products for this order has expired.',
+                ]);
             }
-        } elseif (!$request->filled('delivery_agent_id')) {
-            $agentName = null;
-            $agentPhone = null;
+
+            $rules['items']              = 'required|array|min:1';
+            $rules['items.*.product_id'] = 'required|exists:products,id';
+            $rules['items.*.quantity']   = 'required|integer|min:1';
         }
 
-        if ($request->status === 'cancelled' && $order->status !== 'cancelled') {
-            foreach ($order->items as $item) {
-                if ($item->product) {
-                    $item->product->increment('qty', $item->quantity);
+        $request->validate($rules);
+
+        DB::transaction(function () use ($request, $order, $canEditProducts) {
+            $agentName = $order->delivery_man_name;
+            $agentPhone = $order->delivery_man_phone;
+
+            if ($request->filled('delivery_agent_id') && $request->delivery_agent_id != $order->delivery_agent_id) {
+                $agent = DeliveryAgent::find($request->delivery_agent_id);
+                if ($agent) {
+                    $agentName = $agent->name;
+                    $agentPhone = $agent->phone;
+                }
+            } elseif (!$request->filled('delivery_agent_id')) {
+                $agentName = null;
+                $agentPhone = null;
+            }
+
+            // Product & Financial modifications if items submitted within 2 days
+            if ($request->has('items') && $canEditProducts) {
+                // 1. Restock existing items back to inventory
+                foreach ($order->items as $oldItem) {
+                    if ($oldItem->product) {
+                        $oldItem->product->increment('qty', $oldItem->quantity);
+                    }
+                }
+
+                // 2. Clear previous items
+                $order->items()->delete();
+
+                // 3. Attach new items and deduct stock
+                $newSubtotal = 0.00;
+                foreach ($request->items as $itemData) {
+                    $product = Product::lockForUpdate()->findOrFail($itemData['product_id']);
+
+                    if ($itemData['quantity'] > $product->qty) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'items' => 'Insufficient stock for ' . $product->name . '. Available: ' . $product->qty,
+                        ]);
+                    }
+
+                    $lineTotal = $product->price * $itemData['quantity'];
+                    $newSubtotal += $lineTotal;
+
+                    $order->items()->create([
+                        'product_id' => $product->id,
+                        'quantity'   => $itemData['quantity'],
+                        'price'      => $product->price,
+                        'subtotal'   => $lineTotal,
+                    ]);
+
+                    $product->decrement('qty', $itemData['quantity']);
+                }
+
+                // 4. Recalculate discount if coupon existed
+                $discount = floatval($order->discount_amount);
+                if ($order->coupon_code) {
+                    $coupon = Coupon::where('code', $order->coupon_code)->first();
+                    if ($coupon) {
+                        $discount = $coupon->type === 'percent'
+                            ? ($newSubtotal * ($coupon->value / 100))
+                            : $coupon->value;
+                    }
+                }
+                $discount = min($discount, $newSubtotal);
+
+                // 5. Recompute totals
+                $deliveryCharge = floatval($order->delivery_charge);
+                $newTotal = max(0, ($newSubtotal - $discount) + $deliveryCharge);
+                $paid = floatval($order->paid_amount);
+                $due = max(0, $newTotal - $paid);
+
+                $paymentStatus = $request->payment_status;
+                if ($newTotal > 0 && $paid >= $newTotal) {
+                    $paymentStatus = 'paid';
+                } elseif ($paid > 0 && $paid < $newTotal) {
+                    $paymentStatus = 'partially_paid';
+                }
+
+                $order->subtotal_amount = $newSubtotal;
+                $order->discount_amount = $discount;
+                $order->total_amount    = $newTotal;
+                $order->due_amount      = $due;
+                $order->payment_status  = $paymentStatus;
+            }
+
+            // Stock restoration on cancellation
+            if ($request->status === 'cancelled' && $order->status !== 'cancelled') {
+                foreach ($order->items as $item) {
+                    if ($item->product) {
+                        $item->product->increment('qty', $item->quantity);
+                    }
                 }
             }
-        }
 
-        $order->update([
-            'delivery_agent_id'  => $request->delivery_agent_id ?: null,
-            'status'             => $request->status,
-            'payment_status'     => $request->payment_status,
-            'payment_method'     => $request->payment_method ?? $order->payment_method,
-            'delivery_status'    => $request->delivery_status,
-            'shipping_address'   => $request->shipping_address,
-            'delivery_slot'      => $request->delivery_slot,
-            'delivery_man_name'  => $agentName,
-            'delivery_man_phone' => $agentPhone,
-            'delivery_notes'     => $request->delivery_notes,
-            'updated_by'         => Auth::user()->name ?? 'System',
-        ]);
+            $order->update([
+                'delivery_agent_id'  => $request->delivery_agent_id ?: null,
+                'status'             => $request->status,
+                'payment_status'     => $order->payment_status ?? $request->payment_status,
+                'payment_method'     => $request->payment_method ?? $order->payment_method,
+                'delivery_status'    => $request->delivery_status,
+                'shipping_address'   => $request->shipping_address,
+                'delivery_slot'      => $request->delivery_slot,
+                'delivery_man_name'  => $agentName,
+                'delivery_man_phone' => $agentPhone,
+                'delivery_notes'     => $request->delivery_notes,
+                'updated_by'         => Auth::user()->name ?? 'System',
+            ]);
+        });
 
         return redirect()
-            ->route('order.index')
-            ->with('success', 'Order updated successfully.');
+            ->route('order.show', $order)
+            ->with('success', 'Order updated successfully. Updated invoice is ready for download.');
     }
 
     public function downloadInvoice(Order $order)

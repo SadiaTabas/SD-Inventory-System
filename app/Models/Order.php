@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Models\OrderItem;
 use App\Models\DeliveryAgent;
 use App\Models\OrderPayment;
+use Carbon\Carbon;
 
 class Order extends Model
 {
@@ -46,7 +47,11 @@ class Order extends Model
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-
+public function canBeEdited(): bool
+{
+    // Order must be placed within the last 2 days (48 hours)
+    return $this->created_at->gt(now()->subDays(2)) && !in_array($this->status, ['delivered', 'cancelled']);
+}
     /*
 
      Alias relationship to retrieve customer details.

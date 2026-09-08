@@ -82,12 +82,12 @@
         <div class="form-group">
             <label for="city">City</label>
             <input
-                type="text"
-                id="city"
-                name="city"
-                value="{{ old('city', $defaultAddress->city ?? 'Dhaka') }}"
-                placeholder="Enter city"
-            >
+    type="text"
+    id="city"
+    name="city"
+    value="{{ old('city', $defaultAddress->city ?? '') }}"
+    placeholder="Enter city"
+>
         </div>
 
         

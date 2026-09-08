@@ -123,35 +123,49 @@
         margin: 0;
     }
 
-    .table-responsive-wrapper {
+   .table-responsive-wrapper {
         width: 100%;
-        overflow-x: auto;
-        margin-top: 10px;
+        overflow: visible; /* Prevents clipping and internal scrollbars */
+        margin-top: 12px;
         border: 1px solid #e2e8f0;
-        border-radius: 6px;
+        border-radius: 8px;
         box-sizing: border-box;
+        background: #ffffff;
     }
 
     .sheet-items-table {
         width: 100%;
-        table-layout: fixed;
         border-collapse: collapse;
     }
 
     .sheet-items-table th {
-        background-color: #2c3e50;
+        background-color: #1e293b;
         color: #ffffff !important;
         font-weight: 700;
-        font-size: 13px;
-        padding: 10px 12px;
+        font-size: 13.5px;
+        padding: 12px 14px;
         text-align: left;
     }
 
     .sheet-items-table td {
-        padding: 9px 12px;
+        padding: 14px 12px; /* Gives each row more breathing room */
         border-bottom: 1px solid #e2e8f0;
-        vertical-align: middle;
-        font-size: 13px;
+        vertical-align: top;
+        font-size: 13.5px;
+    }
+
+    /* Keep TomSelect dropdown above all table elements */
+    .sheet-items-table .ts-wrapper {
+        position: relative;
+        z-index: 20;
+    }
+
+    .sheet-items-table .ts-dropdown {
+        z-index: 9999 !important;
+        max-height: 240px;
+        box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15);
+        border: 1px solid #cbd5e1;
+        border-radius: 6px;
     }
 
     .text-right {
@@ -353,14 +367,17 @@
             </div>
 
             <div>
-                <div class="sheet-section-heading">Delivery Method:</div>
+               <div class="sheet-section-heading" style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Delivery Method:</span>
+                     
+                </div>
                 <div class="sheet-options-stack sheet-field">
-                    <label>
-                        <input type="radio" name="delivery_charge" value="60" id="charge_dhaka" checked>
+                    <label style="cursor: default;">
+                        <input type="radio" name="delivery_charge" value="60" id="charge_dhaka" checked onclick="return false;" style="cursor: default;">
                         Inside Dhaka (BDT 60.00)
                     </label>
-                    <label>
-                        <input type="radio" name="delivery_charge" value="120" id="charge_outside">
+                    <label style="cursor: default;">
+                        <input type="radio" name="delivery_charge" value="120" id="charge_outside" onclick="return false;" style="cursor: default;">
                         Outside Dhaka (BDT 120.00)
                     </label>
                 </div>
@@ -368,34 +385,18 @@
                 <div class="sheet-section-heading" style="margin-top: 15px;">Payment Details:</div>
                 <div class="sheet-options-stack sheet-field">
                     <label><input type="radio" name="payment_method" value="cod" checked> Cash on Delivery (COD)</label>
-                    <label><input type="radio" name="payment_method" value="bkash"> bKash</label>
-                    <label><input type="radio" name="payment_method" value="nagad"> Nagad</label>
+                    
                     <label><input type="radio" name="payment_method" value="card"> Card / Online</label>
                 </div>
 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px;">
-                    <div>
-                        <label style="font-size: 12px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Delivery Rider</label>
-                        <select id="delivery_agent_id" name="delivery_agent_id">
-                            <option value="">-- Optional --</option>
-                            @foreach ($deliveryAgents as $agent)
-                                <option value="{{ $agent->id }}">{{ $agent->name }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label style="font-size: 12px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Advance Paid (BDT)</label>
-                        <input
-                            class="sheet-input"
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            id="advance_payment"
-                            name="advance_payment"
-                            value="0"
-                            placeholder="0.00"
-                        >
-                    </div>
+               <div style="margin-top: 15px;">
+                    <label style="font-size: 12px; font-weight: 600; color: #475569; display: block; margin-bottom: 4px;">Delivery Rider</label>
+                    <select id="delivery_agent_id" name="delivery_agent_id">
+                        <option value="">-- Optional --</option>
+                        @foreach ($deliveryAgents as $agent)
+                            <option value="{{ $agent->id }}">{{ $agent->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
             </div>
         </div>
@@ -654,9 +655,10 @@ document.addEventListener('DOMContentLoaded', function () {
                         addressField.value = full;
                         previewBox.innerHTML = '<strong>Delivery:</strong> ' + full;
 
-                        if (full.toLowerCase().includes('dhaka')) {
+                       const targetCity = (city || full).toLowerCase();
+                        if (targetCity.includes('dhaka')) {
                             document.getElementById('charge_dhaka').checked = true;
-                        } else if (full.length > 3) {
+                        } else {
                             document.getElementById('charge_outside').checked = true;
                         }
                         calculateOrderSummary();
