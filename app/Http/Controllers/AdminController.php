@@ -144,6 +144,20 @@ class AdminController extends Controller
         return view('admin.create');
     }
 
+    public function show($admin = null)
+    {
+        if ($admin instanceof User) {
+            return redirect()->route('admin.edit', $admin);
+        }
+        if (is_numeric($admin)) {
+            $user = User::find($admin);
+            if ($user) {
+                return redirect()->route('admin.edit', $user);
+            }
+        }
+        return redirect()->route('admin.index');
+    }
+
     // Store new admin invitation or direct user
     public function store(Request $request)
     {

@@ -8,18 +8,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('delivery_agents', function (Blueprint $table) {
-            if (!Schema::hasColumn('delivery_agents', 'status')) {
-                $table->string('status')->default('available');
+        Schema::table('addresses', function (Blueprint $table) {
+            if (!Schema::hasColumn('addresses', 'user_id')) {
+                $table->foreignId('user_id')->nullable()->after('id')->constrained('users')->nullOnDelete();
+            }
+            if (!Schema::hasColumn('addresses', 'customer_id')) {
+                $table->unsignedBigInteger('customer_id')->nullable()->after('user_id');
             }
         });
     }
 
     public function down(): void
     {
-        Schema::table('delivery_agents', function (Blueprint $table) {
-            if (Schema::hasColumn('delivery_agents', 'status')) {
-                $table->dropColumn('status');
+        Schema::table('addresses', function (Blueprint $table) {
+            if (Schema::hasColumn('addresses', 'user_id')) {
+                $table->dropForeign(['user_id']);
+                $table->dropColumn('user_id');
+            }
+            if (Schema::hasColumn('addresses', 'customer_id')) {
+                $table->dropColumn('customer_id');
             }
         });
     }

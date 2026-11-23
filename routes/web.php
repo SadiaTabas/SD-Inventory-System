@@ -178,6 +178,8 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     Route::resource('customer', CustomerController::class);
 
     // Staff / Admins
+    Route::get('/admin/admins', [AdminController::class, 'index'])->name('admin.admins');
+    Route::get('/admin/admins/create', [AdminController::class, 'create'])->name('admin.admins.create');
     Route::resource('admin', AdminController::class);
 
     // Coupons
@@ -186,6 +188,9 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
     // Inventory & Stock Movements
     Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
     Route::get('/inventory/movements', [InventoryController::class, 'movements'])->name('inventory.movements');
+    Route::get('/inventory/low-stock', function () {
+        return redirect()->route('inventory.index', ['stock_status' => 'low_stock']);
+    });
     Route::post('/inventory/{product}/adjust', [InventoryController::class, 'adjustStock'])->name('inventory.adjust');
 
     // Suppliers
@@ -201,6 +206,9 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 
     // Deliveries & Riders
     Route::get('/deliveries', [DeliveryController::class, 'index'])->name('deliveries.index');
+    Route::get('/deliveries/agents', function () {
+        return redirect()->route('deliveries.index');
+    });
     Route::get('/deliveries/agents/create', [DeliveryController::class, 'create'])->name('deliveries.create');
     Route::post('/deliveries/agents/store', [DeliveryController::class, 'store'])->name('deliveries.store');
     Route::get('/deliveries/agents/{delivery}/edit', [DeliveryController::class, 'edit'])->name('deliveries.edit');
