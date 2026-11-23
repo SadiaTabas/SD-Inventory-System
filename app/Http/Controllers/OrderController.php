@@ -8,6 +8,10 @@ use App\Models\Product;
 use App\Models\DeliveryAgent;
 use App\Models\Coupon;
 use App\Models\OrderPayment;
+use App\Models\StockMovement;
+use App\Models\OrderStatusHistory;
+use App\Models\Delivery;
+use App\Models\ActivityLog;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -15,13 +19,57 @@ use Barryvdh\DomPDF\Facade\Pdf;
 
 class OrderController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
-        $orders = Order::with(['user', 'deliveryAgent', 'items.product', 'payments'])
-            ->latest()
-            ->get();
+        $query = Order::with(['user', 'customer', 'deliveryAgent', 'items.product', 'payments'])->latest();
 
-        return view('orders.index', compact('orders'));
+        // Search
+        if ($request->filled('search')) {
+            $search = trim($request->search);
+            $query->where(function ($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                  ->orWhere('shipping_address', 'like', "%{$search}%")
+                  ->orWhere('delivery_man_name', 'like', "%{$search}%")
+                  ->orWhereHas('user', function ($uq) use ($search) {
+                      $uq->where('name', 'like', "%{$search}%")
+                         ->orWhere('email', 'like', "%{$search}%")
+                         ->orWhere('phone', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Order Source filter
+        if ($request->filled('order_source') && in_array($request->order_source, ['online', 'admin'])) {
+            $query->where('order_source', $request->order_source);
+        }
+
+        // Order Status filter
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Payment Status filter
+        if ($request->filled('payment_status')) {
+            $query->where('payment_status', $request->payment_status);
+        }
+
+        // Delivery Status filter
+        if ($request->filled('delivery_status')) {
+            $query->where('delivery_status', $request->delivery_status);
+        }
+
+        // Date range
+        if ($request->filled('date_from')) {
+            $query->whereDate('created_at', '>=', $request->date_from);
+        }
+        if ($request->filled('date_to')) {
+            $query->whereDate('created_at', '<=', $request->date_to);
+        }
+
+        $orders = $query->paginate(15)->withQueryString();
+        $deliveryAgents = DeliveryAgent::where('status', 'available')->orWhere('status', 1)->get();
+
+        return view('orders.index', compact('orders', 'deliveryAgents'));
     }
 
     public function create()
@@ -31,7 +79,7 @@ class OrderController extends Controller
             ->with('addresses')
             ->get();
 
-        $products = Product::where('qty', '>', 0)->get();
+        $products = Product::where('qty', '>', 0)->where('status', 1)->get();
         $deliveryAgents = DeliveryAgent::where('status', 'available')->orWhere('status', 1)->get();
         $coupons = Coupon::where('status', 1)->get();
 
@@ -41,7 +89,7 @@ class OrderController extends Controller
     public function store(Request $request)
     {
         $authUser = Auth::user();
-        $isAdmin = $authUser && $authUser->role === 'admin';
+        $isAdmin = $authUser && $authUser->isAdmin();
 
         $rules = [
             'items'               => 'required|array|min:1',
@@ -66,7 +114,7 @@ class OrderController extends Controller
 
         $targetUserId = $isAdmin ? $request->user_id : $authUser->id;
 
-        DB::transaction(function () use ($request, $targetUserId, $isAdmin, $authUser) {
+        $createdOrder = DB::transaction(function () use ($request, $targetUserId, $isAdmin, $authUser) {
             $subtotal = 0.00;
             $itemsPayload = [];
 
@@ -84,10 +132,12 @@ class OrderController extends Controller
                 $subtotal += $rowSubtotal;
 
                 $itemsPayload[] = [
-                    'product'  => $product,
-                    'quantity' => $item['quantity'],
-                    'price'    => $product->price,
-                    'subtotal' => $rowSubtotal,
+                    'product'      => $product,
+                    'quantity'     => $item['quantity'],
+                    'price'        => $product->price,
+                    'subtotal'     => $rowSubtotal,
+                    'product_name' => $product->name,
+                    'product_sku'  => $product->sku,
                 ];
             }
 
@@ -99,9 +149,7 @@ class OrderController extends Controller
                 $coupon = Coupon::find($request->coupon_id);
                 if ($coupon && $subtotal >= $coupon->min_order_amount) {
                     $couponCode = $coupon->code;
-                    $discount = $coupon->type === 'percent'
-                        ? ($subtotal * ($coupon->value / 100))
-                        : $coupon->value;
+                    $discount = $coupon->calculateDiscount($subtotal);
                 }
             }
 
@@ -132,10 +180,13 @@ class OrderController extends Controller
             }
 
             // 4. Create Master Order
+            $orderNumber = 'ORD-' . date('Ymd') . '-' . strtoupper(substr(uniqid(), -5));
+
             $order = Order::create([
-                'order_number'       => 'ORD-' . strtoupper(uniqid()),
+                'order_number'       => $orderNumber,
                 'user_id'            => $targetUserId,
                 'customer_id'        => null,
+                'order_source'       => $isAdmin ? 'admin' : 'online',
                 'delivery_agent_id'  => $request->delivery_agent_id ?: null,
                 'order_placed_by'    => $isAdmin ? 'admin' : 'customer',
                 'created_by'         => $authUser->name ?? 'System',
@@ -149,7 +200,7 @@ class OrderController extends Controller
                 'status'             => 'pending',
                 'payment_status'     => $paymentStatus,
                 'payment_method'     => $request->payment_method ?? 'cod',
-                'delivery_status'    => 'pending',
+                'delivery_status'    => $request->filled('delivery_agent_id') ? 'assigned' : 'pending',
                 'shipping_address'   => $request->shipping_address,
                 'delivery_slot'      => $request->delivery_slot,
                 'delivery_man_name'  => $agentName,
@@ -157,33 +208,75 @@ class OrderController extends Controller
                 'delivery_notes'     => $request->delivery_notes,
             ]);
 
-            // 5. Attach each item and decrement quantity
+            // 5. Attach each item and decrement quantity with stock movement log
             foreach ($itemsPayload as $itemData) {
                 $order->items()->create([
-                    'product_id' => $itemData['product']->id,
-                    'quantity'   => $itemData['quantity'],
-                    'price'      => $itemData['price'],
-                    'subtotal'   => $itemData['subtotal'],
+                    'product_id'   => $itemData['product']->id,
+                    'product_name' => $itemData['product_name'],
+                    'product_sku'  => $itemData['product_sku'],
+                    'quantity'     => $itemData['quantity'],
+                    'price'        => $itemData['price'],
+                    'subtotal'     => $itemData['subtotal'],
                 ]);
 
+                $prevStock = $itemData['product']->qty;
                 $itemData['product']->decrement('qty', $itemData['quantity']);
+                $newStock = $itemData['product']->qty;
+
+                StockMovement::create([
+                    'product_id'     => $itemData['product']->id,
+                    'type'           => 'sale',
+                    'quantity'       => -$itemData['quantity'],
+                    'previous_stock' => $prevStock,
+                    'new_stock'      => $newStock,
+                    'reference_type' => 'Order',
+                    'reference_id'   => $order->id,
+                    'user_id'        => $authUser->id,
+                    'user_name'      => $authUser->name,
+                    'reason'         => "Order #{$order->order_number} creation",
+                ]);
             }
 
             // 6. Record Initial Payment Transaction if made
             if ($advancePaid > 0) {
                 $order->payments()->create([
-                    'amount'         => $advancePaid,
-                    'payment_method' => $request->payment_method ?? 'cash',
-                    'transaction_id' => $request->transaction_id,
-                    'payment_date'   => now()->toDateString(),
-                    'note'           => 'Advance / Initial Payment',
-                    'recorded_by'    => $authUser->name ?? 'System',
+                    'user_id'             => $targetUserId,
+                    'amount'              => $advancePaid,
+                    'payment_method'      => $request->payment_method ?? 'cash',
+                    'transaction_id'      => $request->transaction_id,
+                    'payment_date'        => now()->toDateString(),
+                    'payment_status'      => $paymentStatus,
+                    'verification_status' => 'verified',
+                    'note'                => 'Advance / Initial Payment',
+                    'recorded_by'         => $authUser->name ?? 'System',
                 ]);
             }
+
+            // 7. Status history
+            $order->statusHistories()->create([
+                'status'     => 'pending',
+                'comment'    => 'Order created by ' . ($isAdmin ? 'Admin' : 'Customer'),
+                'changed_by' => $authUser->name ?? 'System',
+            ]);
+
+            // 8. If delivery agent assigned, create delivery entry
+            if ($request->filled('delivery_agent_id')) {
+                Delivery::create([
+                    'order_id'          => $order->id,
+                    'delivery_agent_id' => $request->delivery_agent_id,
+                    'delivery_status'   => 'assigned',
+                    'assigned_at'       => now(),
+                    'notes'             => $request->delivery_notes,
+                ]);
+            }
+
+            ActivityLog::log('Order Created', 'Order', $order->id, "Order #{$order->order_number} created with total ৳" . number_format($order->total_amount, 2));
+
+            return $order;
         });
 
         return redirect()
-            ->route('order.index')
+            ->route('order.show', $createdOrder)
             ->with('success', 'Order created successfully.');
     }
 
@@ -201,19 +294,21 @@ class OrderController extends Controller
             $paymentAmount = floatval($request->amount);
 
             $order->payments()->create([
-                'amount'         => $paymentAmount,
-                'payment_method' => $request->payment_method,
-                'transaction_id' => $request->transaction_id,
-                'payment_date'   => $request->payment_date,
-                'note'           => $request->filled('note') 
-                                        ? $request->note 
-                                        : (($order->paid_amount ?? 0) > 0 ? 'Installment Payment' : 'Advance Payment'),
-                'recorded_by'    => Auth::user()->name ?? 'System',
+                'user_id'             => $order->user_id,
+                'amount'              => $paymentAmount,
+                'payment_method'      => $request->payment_method,
+                'transaction_id'      => $request->transaction_id,
+                'payment_date'        => $request->payment_date,
+                'payment_status'      => 'paid',
+                'verification_status' => 'verified',
+                'note'                => $request->filled('note') 
+                                            ? $request->note 
+                                            : (($order->paid_amount ?? 0) > 0 ? 'Installment Payment' : 'Advance Payment'),
+                'recorded_by'         => Auth::user()->name ?? 'System',
             ]);
 
             $newPaid = $order->paid_amount + $paymentAmount;
             $newDue = max(0, $order->total_amount - $newPaid);
-
             $status = $newDue <= 0 ? 'paid' : 'partially_paid';
 
             $order->update([
@@ -222,6 +317,8 @@ class OrderController extends Controller
                 'payment_status' => $status,
                 'updated_by'     => Auth::user()->name ?? 'System',
             ]);
+
+            ActivityLog::log('Payment Recorded', 'Order', $order->id, "Payment of ৳{$paymentAmount} recorded for Order #{$order->order_number}");
         });
 
         return redirect()
@@ -229,23 +326,107 @@ class OrderController extends Controller
             ->with('success', 'Payment recorded successfully.');
     }
 
+    public function verifyPayment(Request $request, OrderPayment $payment)
+    {
+        $request->validate([
+            'action' => 'required|in:verify,reject',
+            'note'   => 'nullable|string|max:255',
+        ]);
+
+        $order = $payment->order;
+
+        DB::transaction(function () use ($payment, $order, $request) {
+            if ($request->action === 'verify') {
+                $payment->update([
+                    'verification_status' => 'verified',
+                    'payment_status'      => 'paid',
+                    'note'                => $payment->note . ' (Verified by ' . Auth::user()->name . ')',
+                ]);
+
+                $newPaid = $order->paid_amount + $payment->amount;
+                $newDue = max(0, $order->total_amount - $newPaid);
+                $paymentStatus = $newDue <= 0 ? 'paid' : 'partially_paid';
+
+                $order->update([
+                    'paid_amount'    => $newPaid,
+                    'due_amount'     => $newDue,
+                    'payment_status' => $paymentStatus,
+                    'updated_by'     => Auth::user()->name,
+                ]);
+
+                ActivityLog::log('Payment Verified', 'OrderPayment', $payment->id, "Transaction {$payment->transaction_id} verified for Order #{$order->order_number}");
+            } else {
+                $payment->update([
+                    'verification_status' => 'rejected',
+                    'payment_status'      => 'failed',
+                    'note'                => $payment->note . ' (Rejected: ' . ($request->note ?? 'Invalid reference') . ')',
+                ]);
+
+                ActivityLog::log('Payment Rejected', 'OrderPayment', $payment->id, "Transaction {$payment->transaction_id} rejected for Order #{$order->order_number}");
+            }
+        });
+
+        return back()->with('success', 'Payment ' . ($request->action === 'verify' ? 'verified' : 'rejected') . ' successfully.');
+    }
+
+    public function assignRider(Request $request, Order $order)
+    {
+        $request->validate([
+            'delivery_agent_id' => 'required|exists:delivery_agents,id',
+            'delivery_notes'    => 'nullable|string',
+        ]);
+
+        $agent = DeliveryAgent::findOrFail($request->delivery_agent_id);
+
+        DB::transaction(function () use ($order, $agent, $request) {
+            $order->update([
+                'delivery_agent_id'  => $agent->id,
+                'delivery_man_name'  => $agent->name,
+                'delivery_man_phone' => $agent->phone,
+                'delivery_status'    => 'assigned',
+                'delivery_notes'     => $request->delivery_notes ?? $order->delivery_notes,
+                'updated_by'         => Auth::user()->name,
+            ]);
+
+            Delivery::updateOrCreate(
+                ['order_id' => $order->id],
+                [
+                    'delivery_agent_id' => $agent->id,
+                    'delivery_status'   => 'assigned',
+                    'assigned_at'       => now(),
+                    'notes'             => $request->delivery_notes,
+                ]
+            );
+
+            $order->statusHistories()->create([
+                'status'     => $order->status,
+                'comment'    => "Assigned to delivery rider: {$agent->name} ({$agent->phone})",
+                'changed_by' => Auth::user()->name,
+            ]);
+
+            ActivityLog::log('Rider Assigned', 'Order', $order->id, "Rider {$agent->name} assigned to Order #{$order->order_number}");
+        });
+
+        return back()->with('success', "Delivery rider {$agent->name} assigned successfully.");
+    }
+
     public function show(Order $order)
     {
-        $order->load(['user', 'deliveryAgent', 'items.product', 'payments']);
+        $order->load(['user', 'customer', 'deliveryAgent', 'items.product', 'payments', 'statusHistories', 'delivery']);
+        $deliveryAgents = DeliveryAgent::where('status', 'available')->orWhere('status', 1)->get();
 
-        return view('orders.show', compact('order'));
+        return view('orders.show', compact('order', 'deliveryAgents'));
     }
 
     public function edit(Order $order)
     {
-        // Check 2-day window (48 hours)
         $hoursSinceCreation = $order->created_at->diffInHours(now());
         $isEditable = ($hoursSinceCreation <= 48) && !in_array($order->status, ['delivered', 'cancelled']);
 
         $order->load(['user', 'deliveryAgent', 'items.product', 'payments']);
         $customers = User::where('role', 'customer')->where('status', 1)->get();
         $deliveryAgents = DeliveryAgent::all();
-        $products = Product::all();
+        $products = Product::where('status', true)->get();
 
         return view('orders.edit', compact('order', 'customers', 'deliveryAgents', 'products', 'isEditable'));
     }
@@ -264,6 +445,8 @@ class OrderController extends Controller
             'delivery_agent_id' => 'nullable|exists:delivery_agents,id',
             'delivery_slot'     => 'nullable|string',
             'delivery_notes'    => 'nullable|string',
+            'admin_notes'       => 'nullable|string',
+            'cancel_reason'     => 'nullable|string',
         ];
 
         if ($request->has('items') && is_array($request->items)) {
@@ -297,10 +480,25 @@ class OrderController extends Controller
 
             // Product & Financial modifications if items submitted within 2 days
             if ($request->has('items') && $canEditProducts) {
-                // 1. Restock existing items back to inventory
+                // 1. Restock existing items back to inventory with log
                 foreach ($order->items as $oldItem) {
                     if ($oldItem->product) {
+                        $prevStock = $oldItem->product->qty;
                         $oldItem->product->increment('qty', $oldItem->quantity);
+                        $newStock = $oldItem->product->qty;
+
+                        StockMovement::create([
+                            'product_id'     => $oldItem->product_id,
+                            'type'           => 'adjustment',
+                            'quantity'       => $oldItem->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock'      => $newStock,
+                            'reference_type' => 'Order',
+                            'reference_id'   => $order->id,
+                            'user_id'        => Auth::id(),
+                            'user_name'      => Auth::user()->name,
+                            'reason'         => "Order #{$order->order_number} product edit restock",
+                        ]);
                     }
                 }
 
@@ -322,13 +520,30 @@ class OrderController extends Controller
                     $newSubtotal += $lineTotal;
 
                     $order->items()->create([
-                        'product_id' => $product->id,
-                        'quantity'   => $itemData['quantity'],
-                        'price'      => $product->price,
-                        'subtotal'   => $lineTotal,
+                        'product_id'   => $product->id,
+                        'product_name' => $product->name,
+                        'product_sku'  => $product->sku,
+                        'quantity'     => $itemData['quantity'],
+                        'price'        => $product->price,
+                        'subtotal'     => $lineTotal,
                     ]);
 
+                    $prevStock = $product->qty;
                     $product->decrement('qty', $itemData['quantity']);
+                    $newStock = $product->qty;
+
+                    StockMovement::create([
+                        'product_id'     => $product->id,
+                        'type'           => 'sale',
+                        'quantity'       => -$itemData['quantity'],
+                        'previous_stock' => $prevStock,
+                        'new_stock'      => $newStock,
+                        'reference_type' => 'Order',
+                        'reference_id'   => $order->id,
+                        'user_id'        => Auth::id(),
+                        'user_name'      => Auth::user()->name,
+                        'reason'         => "Order #{$order->order_number} product update",
+                    ]);
                 }
 
                 // 4. Recalculate discount if coupon existed
@@ -336,9 +551,7 @@ class OrderController extends Controller
                 if ($order->coupon_code) {
                     $coupon = Coupon::where('code', $order->coupon_code)->first();
                     if ($coupon) {
-                        $discount = $coupon->type === 'percent'
-                            ? ($newSubtotal * ($coupon->value / 100))
-                            : $coupon->value;
+                        $discount = $coupon->calculateDiscount($newSubtotal);
                     }
                 }
                 $discount = min($discount, $newSubtotal);
@@ -367,9 +580,33 @@ class OrderController extends Controller
             if ($request->status === 'cancelled' && $order->status !== 'cancelled') {
                 foreach ($order->items as $item) {
                     if ($item->product) {
+                        $prevStock = $item->product->qty;
                         $item->product->increment('qty', $item->quantity);
+                        $newStock = $item->product->qty;
+
+                        StockMovement::create([
+                            'product_id'     => $item->product_id,
+                            'type'           => 'cancellation',
+                            'quantity'       => $item->quantity,
+                            'previous_stock' => $prevStock,
+                            'new_stock'      => $newStock,
+                            'reference_type' => 'Order',
+                            'reference_id'   => $order->id,
+                            'user_id'        => Auth::id(),
+                            'user_name'      => Auth::user()->name,
+                            'reason'         => "Order #{$order->order_number} cancelled: " . ($request->cancel_reason ?? 'Admin cancellation'),
+                        ]);
                     }
                 }
+            }
+
+            // Record status change history if status changed
+            if ($order->status !== $request->status) {
+                $order->statusHistories()->create([
+                    'status'     => $request->status,
+                    'comment'    => "Status changed from {$order->status} to {$request->status} by " . Auth::user()->name,
+                    'changed_by' => Auth::user()->name,
+                ]);
             }
 
             $order->update([
@@ -383,18 +620,22 @@ class OrderController extends Controller
                 'delivery_man_name'  => $agentName,
                 'delivery_man_phone' => $agentPhone,
                 'delivery_notes'     => $request->delivery_notes,
+                'admin_notes'        => $request->admin_notes ?? $order->admin_notes,
+                'cancel_reason'      => $request->cancel_reason ?? $order->cancel_reason,
                 'updated_by'         => Auth::user()->name ?? 'System',
             ]);
+
+            ActivityLog::log('Order Updated', 'Order', $order->id, "Order #{$order->order_number} updated. Status: {$request->status}");
         });
 
         return redirect()
             ->route('order.show', $order)
-            ->with('success', 'Order updated successfully. Updated invoice is ready for download.');
+            ->with('success', 'Order updated successfully.');
     }
 
     public function downloadInvoice(Order $order)
     {
-        $order->load(['user', 'deliveryAgent', 'items.product', 'payments']);
+        $order->load(['user', 'customer', 'deliveryAgent', 'items.product', 'payments']);
 
         $pdf = Pdf::loadView('orders.invoice', compact('order'))
             ->setPaper('a4', 'portrait');
@@ -411,6 +652,8 @@ class OrderController extends Controller
                 }
             }
         }
+
+        ActivityLog::log('Order Deleted', 'Order', $order->id, "Order #{$order->order_number} deleted.");
 
         $order->delete();
 

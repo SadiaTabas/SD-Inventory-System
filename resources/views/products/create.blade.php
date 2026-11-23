@@ -414,6 +414,17 @@
 
                 </div>
 
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 18px;">
+                    <div>
+                        <label for="sku" class="sheet-label">SKU (Stock Keeping Unit):</label>
+                        <input type="text" id="sku" name="sku" class="sheet-input" value="{{ old('sku') }}" placeholder="Auto-generated if empty">
+                    </div>
+                    <div>
+                        <label for="barcode" class="sheet-label">Barcode / UPC:</label>
+                        <input type="text" id="barcode" name="barcode" class="sheet-input" value="{{ old('barcode') }}" placeholder="e.g. 890123456789">
+                    </div>
+                </div>
+
 
                 {{-- Category --}}
                 <div class="sheet-field">
@@ -482,7 +493,7 @@
                         for="price"
                         class="sheet-label"
                     >
-                        Price:
+                        Selling Price:
                     </label>
 
                  <div class="price-wrapper" style="position: relative; display: flex; align-items: center;">
@@ -502,6 +513,28 @@
     >
 </div>
 
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 18px;">
+                    <div>
+                        <label for="cost_price" class="sheet-label">Cost Price (BDT):</label>
+                        <input type="number" step="0.01" min="0" id="cost_price" name="cost_price" class="sheet-input" value="{{ old('cost_price', '0.00') }}" placeholder="0.00">
+                    </div>
+                    <div>
+                        <label for="min_stock_level" class="sheet-label">Low Stock Threshold:</label>
+                        <input type="number" min="0" id="min_stock_level" name="min_stock_level" class="sheet-input" value="{{ old('min_stock_level', 5) }}">
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 20px; align-items: center; margin-bottom: 18px;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; color: #1e293b;">
+                        <input type="checkbox" name="status" value="1" {{ old('status', 1) ? 'checked' : '' }}>
+                        Active on Storefront
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; cursor: pointer; color: #1e293b;">
+                        <input type="checkbox" name="featured" value="1" {{ old('featured') ? 'checked' : '' }}>
+                        Featured Product
+                    </label>
                 </div>
 
             </div>

@@ -13,15 +13,32 @@ class RoleMiddleware
         Closure $next,
         ...$roles
     ): Response {
+        $user = $request->user();
 
-        if (!$request->user()) {
+        if (!$user) {
             return redirect()->route('login');
         }
 
-        if (!in_array($request->user()->role, $roles)) {
-            abort(403, 'You are not authorized to access this page.');
+        if ($user->status != 1) {
+            auth()->logout();
+            return redirect()->route('login')->withErrors(['email' => 'Your account has been deactivated.']);
         }
 
-        return $next($request);
+        // Super Admin has unrestricted access to everything
+        if ($user->role === 'super_admin') {
+            return $next($request);
+        }
+
+        // If 'admin' is in the allowed roles, permit any admin staff
+        if (in_array('admin', $roles) && $user->isAdmin()) {
+            return $next($request);
+        }
+
+        // Direct role match
+        if (in_array($user->role, $roles)) {
+            return $next($request);
+        }
+
+        abort(403, 'You are not authorized to access this page.');
     }
 }

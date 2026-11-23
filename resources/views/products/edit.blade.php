@@ -4,7 +4,7 @@
 
 @section('content')
 
-<div class="container">
+<div class="container" style="max-width: 900px;">
 
     <h1>Edit Product: {{ $product->name }}</h1>
 
@@ -27,9 +27,8 @@
         @csrf
         @method('PUT')
 
-         
         <div class="form-group">
-            <label for="name">Product Name</label>
+            <label for="name">Product Name *</label>
             <input
                 type="text"
                 id="name"
@@ -40,9 +39,31 @@
             >
         </div>
 
-        
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label for="sku">SKU (Stock Keeping Unit)</label>
+                <input
+                    type="text"
+                    id="sku"
+                    name="sku"
+                    value="{{ old('sku', $product->sku) }}"
+                    placeholder="e.g. PRD-001"
+                >
+            </div>
+            <div class="form-group">
+                <label for="barcode">Barcode / UPC</label>
+                <input
+                    type="text"
+                    id="barcode"
+                    name="barcode"
+                    value="{{ old('barcode', $product->barcode) }}"
+                    placeholder="e.g. 890123456789"
+                >
+            </div>
+        </div>
+
         <div class="form-group">
-            <label for="category_id">Category</label>
+            <label for="category_id">Category *</label>
             <select
                 id="category_id"
                 name="category_id"
@@ -60,7 +81,6 @@
             </select>
         </div>
 
-        
         <div class="form-group">
             <label for="image">Product Image</label>
             @if ($product->image && file_exists(public_path($product->image)))
@@ -81,61 +101,110 @@
             <small style="color: #6b7280;">Leave blank if you don't want to change the image.</small>
         </div>
 
-         
-        <div class="form-group">
-            <label for="qty">Quantity</label>
-            <input
-                type="number"
-                id="qty"
-                name="qty"
-                value="{{ old('qty', $product->qty) }}"
-                placeholder="Enter stock quantity"
-                min="0"
-                required
-            >
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label for="qty">Stock Quantity *</label>
+                <input
+                    type="number"
+                    id="qty"
+                    name="qty"
+                    value="{{ old('qty', $product->qty) }}"
+                    placeholder="Enter stock quantity"
+                    min="0"
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label for="min_stock_level">Low Stock Threshold</label>
+                <input
+                    type="number"
+                    id="min_stock_level"
+                    name="min_stock_level"
+                    value="{{ old('min_stock_level', $product->min_stock_level ?? 5) }}"
+                    min="0"
+                >
+            </div>
         </div>
 
-       
-        <div class="form-group">
-            <label for="price">Price (BDT)</label>
-            <input
-                type="number"
-                id="price"
-                name="price"
-                value="{{ old('price', $product->price) }}"
-                placeholder="Enter price"
-                min="0"
-                step="0.01"
-                required
-            >
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+            <div class="form-group">
+                <label for="price">Selling Price (৳ BDT) *</label>
+                <input
+                    type="number"
+                    id="price"
+                    name="price"
+                    value="{{ old('price', $product->price) }}"
+                    placeholder="Enter price"
+                    min="0"
+                    step="0.01"
+                    required
+                >
+            </div>
+            <div class="form-group">
+                <label for="cost_price">Unit Cost Price (৳ BDT)</label>
+                <input
+                    type="number"
+                    id="cost_price"
+                    name="cost_price"
+                    value="{{ old('cost_price', $product->cost_price ?? 0) }}"
+                    placeholder="Cost price"
+                    min="0"
+                    step="0.01"
+                >
+            </div>
         </div>
 
-         
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px;">
+            <div class="form-group">
+                <label for="status">Publication Status *</label>
+                <select id="status" name="status" required>
+                    <option value="1" {{ old('status', $product->status) == 1 ? 'selected' : '' }}>Active (Available on Store)</option>
+                    <option value="0" {{ old('status', $product->status) == 0 ? 'selected' : '' }}>Inactive (Hidden)</option>
+                </select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: center; padding-top: 24px;">
+                <label style="display: flex; align-items: center; gap: 8px; font-weight: 600; cursor: pointer;">
+                    <input
+                        type="checkbox"
+                        name="featured"
+                        value="1"
+                        {{ old('featured', $product->featured) ? 'checked' : '' }}
+                        style="width: 18px; height: 18px;"
+                    >
+                    Featured Product (Showcase on Homepage)
+                </label>
+            </div>
+        </div>
+
         <div class="form-group">
-            <label for="description">Description</label>
+            <label for="description">Product Description</label>
             <textarea
                 id="description"
                 name="description"
+                rows="4"
                 placeholder="Enter product description"
             >{{ old('description', $product->description) }}</textarea>
         </div>
 
-        <!-- Submit -->
         <button
             type="submit"
             class="primary-button"
+            style="background: #2563eb; color: #fff; padding: 10px 24px; border: none; border-radius: 6px; font-weight: 700; cursor: pointer;"
         >
             Update Product
         </button>
 
     </form>
 
-    <a
-        class="back-link"
-        href="{{ route('product.index') }}"
-    >
-        ← Back to Products
-    </a>
+    <div style="margin-top: 20px;">
+        <a
+            class="back-link"
+            href="{{ route('product.index') }}"
+            style="color: #64748b; text-decoration: none; font-weight: 600;"
+        >
+            ← Back to Products List
+        </a>
+    </div>
 
 </div>
 

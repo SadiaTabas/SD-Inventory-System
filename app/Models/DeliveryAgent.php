@@ -13,11 +13,12 @@ class DeliveryAgent extends Model
     protected $fillable = [
         'name',
         'phone',
+        'email',
         'emergency_contact',
         'vehicle_type',
         'vehicle_number',
         'address',
-        'status',
+        'status', // available, busy, inactive
         'created_by',
         'updated_by',
     ];
@@ -25,5 +26,10 @@ class DeliveryAgent extends Model
     public function orders()
     {
         return $this->hasMany(Order::class, 'delivery_agent_id');
+    }
+
+    public function deliveries()
+    {
+        return $this->hasMany(Delivery::class, 'delivery_agent_id');
     }
 }

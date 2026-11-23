@@ -8,7 +8,8 @@ use App\Models\User;
 use App\Models\OrderItem;
 use App\Models\DeliveryAgent;
 use App\Models\OrderPayment;
-use Carbon\Carbon;
+use App\Models\OrderStatusHistory;
+use App\Models\Delivery;
 
 class Order extends Model
 {
@@ -18,6 +19,7 @@ class Order extends Model
         'order_number',
         'user_id',
         'customer_id',
+        'order_source', // online, admin
         'delivery_agent_id',
         'order_placed_by',
         'created_by',
@@ -25,63 +27,77 @@ class Order extends Model
         'subtotal_amount',
         'discount_amount',
         'coupon_code',
+        'delivery_charge',
         'total_amount',
         'paid_amount',
         'due_amount',
-        'status',
-        'payment_status',
-        'payment_method',
-        'delivery_status',
+        'status', // pending, processing, shipped, out_for_delivery, delivered, cancelled
+        'payment_status', // pending, partially_paid, paid, refunded
+        'payment_method', // cod, bkash, nagad, cash
+        'delivery_status', // pending, assigned, out_for_delivery, delivered, failed
         'shipping_address',
         'delivery_slot',
         'delivery_man_name',
         'delivery_man_phone',
         'delivery_notes',
-        'delivery_charge'
+        'cancel_reason',
+        'admin_notes',
     ];
 
-    /*
-      The user account associated with the order.
-     */
+    protected $casts = [
+        'subtotal_amount' => 'float',
+        'discount_amount' => 'float',
+        'delivery_charge' => 'float',
+        'total_amount'    => 'float',
+        'paid_amount'     => 'float',
+        'due_amount'      => 'float',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-public function canBeEdited(): bool
-{
-    // Order must be placed within the last 2 days (48 hours)
-    return $this->created_at->gt(now()->subDays(2)) && !in_array($this->status, ['delivered', 'cancelled']);
-}
-    /*
 
-     Alias relationship to retrieve customer details.
-     */
     public function customer()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'user_id')->withDefault(function () {
+            // fallback if customer_id was used
+            return new User(['name' => 'Walk-in Customer']);
+        });
     }
 
-    /*
-     * The assigned delivery agent.
-     */
     public function deliveryAgent()
     {
         return $this->belongsTo(DeliveryAgent::class, 'delivery_agent_id');
     }
 
-    /*
-     * The items belonging to this order.
-     */
     public function items()
     {
         return $this->hasMany(OrderItem::class, 'order_id');
     }
 
-    /*
-     * The partial/advance payment transactions for this order.
-     */
     public function payments()
     {
         return $this->hasMany(OrderPayment::class, 'order_id')->latest();
+    }
+
+    public function statusHistories()
+    {
+        return $this->hasMany(OrderStatusHistory::class, 'order_id')->latest();
+    }
+
+    public function delivery()
+    {
+        return $this->hasOne(Delivery::class, 'order_id');
+    }
+
+    public function canBeEdited(): bool
+    {
+        return $this->created_at->gt(now()->subDays(2)) && !in_array($this->status, ['delivered', 'cancelled']);
+    }
+
+    public function canBeCancelled(): bool
+    {
+        return !in_array($this->status, ['delivered', 'cancelled']);
     }
 }

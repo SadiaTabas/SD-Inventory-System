@@ -11,7 +11,7 @@ class User extends Authenticatable implements MustVerifyEmail
 {
     use HasFactory, Notifiable;
 
-protected $fillable = [
+    protected $fillable = [
         'name',
         'email',
         'phone',
@@ -30,6 +30,7 @@ protected $fillable = [
 
     protected $casts = [
         'email_verified_at' => 'datetime',
+        'status'            => 'boolean',
     ];
 
     public function addresses()
@@ -37,8 +38,62 @@ protected $fillable = [
         return $this->hasMany(Address::class);
     }
 
+    public function defaultAddress()
+    {
+        return $this->hasOne(Address::class)->where('is_default', true);
+    }
+
     public function orders()
     {
-        return $this->hasMany(Order::class);
+        return $this->hasMany(Order::class, 'user_id');
+    }
+
+    public function wishlists()
+    {
+        return $this->hasMany(Wishlist::class);
+    }
+
+    public function wishlistProducts()
+    {
+        return $this->belongsToMany(Product::class, 'wishlists', 'user_id', 'product_id')->withTimestamps();
+    }
+
+    public function cart()
+    {
+        return $this->hasOne(Cart::class);
+    }
+
+    public function reviews()
+    {
+        return $this->hasMany(ProductReview::class);
+    }
+
+    public function isAdmin(): bool
+    {
+        return in_array($this->role, [
+            'super_admin',
+            'admin',
+            'inventory_manager',
+            'order_manager',
+            'customer_support',
+        ]);
+    }
+
+    public function isCustomer(): bool
+    {
+        return $this->role === 'customer';
+    }
+
+    public function hasRole(string|array $roles): bool
+    {
+        if ($this->role === 'super_admin') {
+            return true;
+        }
+
+        if (is_array($roles)) {
+            return in_array($this->role, $roles);
+        }
+
+        return $this->role === $roles;
     }
 }

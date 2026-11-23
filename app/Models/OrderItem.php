@@ -15,11 +15,19 @@ class OrderItem extends Model
     protected $fillable = [
         'order_id',
         'product_id',
+        'product_name',
+        'product_sku',
         'quantity',
         'price',
         'subtotal',
         'created_by',
         'updated_by',
+    ];
+
+    protected $casts = [
+        'price'    => 'float',
+        'subtotal' => 'float',
+        'quantity' => 'integer',
     ];
 
     public function order()
