@@ -88,128 +88,146 @@ class StorefrontController extends Controller
 
     public function shop(Request $request)
     {
-        $query = Product::where('status', true)->with('category');
+        try {
+            $query = Product::where('status', true)->with('category');
 
-        // Search
-        if ($request->filled('q')) {
-            $search = trim($request->q);
-            $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%");
-            });
-        }
+            // Search
+            if ($request->filled('q')) {
+                $search = trim($request->q);
+                $query->where(function ($q) use ($search) {
+                    $q->where('name', 'like', "%{$search}%")
+                      ->orWhere('description', 'like', "%{$search}%")
+                      ->orWhere('sku', 'like', "%{$search}%");
+                });
+            }
 
-        // Category filter
-        if ($request->filled('category')) {
-            $catId = $request->category;
-            $query->where('category_id', $catId);
-        }
+            // Category filter
+            if ($request->filled('category')) {
+                $catId = $request->category;
+                $query->where('category_id', $catId);
+            }
 
-        // Price filter
-        if ($request->filled('min_price')) {
-            $query->where('price', '>=', floatval($request->min_price));
-        }
-        if ($request->filled('max_price')) {
-            $query->where('price', '<=', floatval($request->max_price));
-        }
+            // Price filter
+            if ($request->filled('min_price')) {
+                $query->where('price', '>=', floatval($request->min_price));
+            }
+            if ($request->filled('max_price')) {
+                $query->where('price', '<=', floatval($request->max_price));
+            }
 
-        // Availability
-        if ($request->filled('in_stock') && $request->in_stock == '1') {
-            $query->where('qty', '>', 0);
-        }
+            // Availability
+            if ($request->filled('in_stock') && $request->in_stock == '1') {
+                $query->where('qty', '>', 0);
+            }
 
-        // Sorting
-        $sort = $request->get('sort', 'newest');
-        switch ($sort) {
-            case 'price_asc':
-                $query->orderBy('price', 'asc');
-                break;
-            case 'price_desc':
-                $query->orderBy('price', 'desc');
-                break;
-            case 'name_asc':
-                $query->orderBy('name', 'asc');
-                break;
-            case 'popularity':
-                $query->withCount('orderItems')->orderByDesc('order_items_count');
-                break;
-            case 'newest':
-            default:
-                $query->latest();
-                break;
-        }
+            // Sorting
+            $sort = $request->get('sort', 'newest');
+            switch ($sort) {
+                case 'price_asc':
+                    $query->orderBy('price', 'asc');
+                    break;
+                case 'price_desc':
+                    $query->orderBy('price', 'desc');
+                    break;
+                case 'name_asc':
+                    $query->orderBy('name', 'asc');
+                    break;
+                case 'popularity':
+                    $query->withCount('orderItems')->orderByDesc('order_items_count');
+                    break;
+                case 'newest':
+                default:
+                    $query->latest();
+                    break;
+            }
 
-        $products = $query->paginate(12)->withQueryString();
-        $categories = Category::where('status', true)->withCount('products')->get();
-        $maxPrice = Product::where('status', true)->max('price') ?? 10000;
+            $products = $query->paginate(12)->withQueryString();
+            $categories = Category::where('status', true)->withCount('products')->get();
+            $maxPrice = Product::where('status', true)->max('price') ?? 10000;
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Database connection failed on shop: ' . $e->getMessage());
+            $products = new \Illuminate\Pagination\LengthAwarePaginator([], 0, 12);
+            $categories = collect();
+            $maxPrice = 10000;
+            $sort = $request->get('sort', 'newest');
+        }
 
         return view('storefront.shop', compact('products', 'categories', 'maxPrice', 'sort'));
     }
 
     public function category($category)
     {
-        if ($category instanceof Category) {
-            $cat = $category;
-        } else {
-            $cat = Category::where('slug', $category)->orWhere('id', $category)->firstOrFail();
-        }
+        try {
+            if ($category instanceof Category) {
+                $cat = $category;
+            } else {
+                $cat = Category::where('slug', $category)->orWhere('id', $category)->firstOrFail();
+            }
 
-        if (!$cat->status) {
+            if (!$cat->status) {
+                abort(404);
+            }
+            $category = $cat;
+
+            $products = Product::where('status', true)
+                ->where('category_id', $category->id)
+                ->with('category')
+                ->latest()
+                ->paginate(12);
+
+            $categories = Category::where('status', true)->withCount('products')->get();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Category fetch failed: ' . $e->getMessage());
             abort(404);
         }
-        $category = $cat;
-
-        $products = Product::where('status', true)
-            ->where('category_id', $category->id)
-            ->with('category')
-            ->latest()
-            ->paginate(12);
-
-        $categories = Category::where('status', true)->withCount('products')->get();
 
         return view('storefront.category', compact('category', 'products', 'categories'));
     }
 
     public function productDetails($product)
     {
-        if ($product instanceof Product) {
-            $prod = $product;
-        } elseif (is_numeric($product)) {
-            $prod = Product::findOrFail($product);
-        } else {
-            if (preg_match('/-(\d+)$/', $product, $matches)) {
-                $prod = Product::find($matches[1]);
+        try {
+            if ($product instanceof Product) {
+                $prod = $product;
+            } elseif (is_numeric($product)) {
+                $prod = Product::findOrFail($product);
+            } else {
+                if (preg_match('/-(\d+)$/', $product, $matches)) {
+                    $prod = Product::find($matches[1]);
+                }
+                if (!isset($prod) || !$prod) {
+                    $prod = Product::where('sku', $product)->first();
+                }
+                if (!isset($prod) || !$prod) {
+                    abort(404, 'Product not found.');
+                }
             }
-            if (!isset($prod) || !$prod) {
-                $prod = Product::where('sku', $product)->first();
+
+            if (!$prod->status) {
+                abort(404, 'Product not found or currently unavailable.');
             }
-            if (!isset($prod) || !$prod) {
-                abort(404, 'Product not found.');
+
+            $product = $prod;
+            $product->load(['category', 'reviews.user']);
+
+            $relatedProducts = Product::where('status', true)
+                ->where('category_id', $product->category_id)
+                ->where('id', '!=', $product->id)
+                ->take(4)
+                ->get();
+
+            $userHasPurchased = false;
+            if (auth()->check()) {
+                $userHasPurchased = DB::table('orders')
+                    ->join('order_items', 'orders.id', '=', 'order_items.order_id')
+                    ->where('orders.user_id', auth()->id())
+                    ->where('order_items.product_id', $product->id)
+                    ->where('orders.status', 'delivered')
+                    ->exists();
             }
-        }
-
-        if (!$prod->status) {
-            abort(404, 'Product not found or currently unavailable.');
-        }
-
-        $product = $prod;
-        $product->load(['category', 'reviews.user']);
-
-        $relatedProducts = Product::where('status', true)
-            ->where('category_id', $product->category_id)
-            ->where('id', '!=', $product->id)
-            ->take(4)
-            ->get();
-
-        $userHasPurchased = false;
-        if (auth()->check()) {
-            $userHasPurchased = DB::table('orders')
-                ->join('order_items', 'orders.id', '=', 'order_items.order_id')
-                ->where('orders.user_id', auth()->id())
-                ->where('order_items.product_id', $product->id)
-                ->where('orders.status', 'delivered')
-                ->exists();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Product details failed: ' . $e->getMessage());
+            abort(404, 'Product not found.');
         }
 
         return view('storefront.product-details', compact('product', 'relatedProducts', 'userHasPurchased'));
