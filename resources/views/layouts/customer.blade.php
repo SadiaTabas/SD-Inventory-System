@@ -604,7 +604,7 @@
             </div>
         @endif
 
-        @if($errors->any())
+        @if(isset($errors) && $errors->any())
             <div class="alert alert-danger">
                 <ul style="padding-left: 18px; margin: 0;">
                     @foreach($errors->all() as $err)

@@ -102,4 +102,9 @@ class Product extends Model
     {
         return $this->status && $this->qty > 0;
     }
+
+    public function getSlugAttribute(): string
+    {
+        return \Illuminate\Support\Str::slug($this->name) . '-' . $this->id;
+    }
 }

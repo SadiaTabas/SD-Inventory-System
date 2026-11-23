@@ -61,7 +61,6 @@ class EcommerceSystemTest extends TestCase
         // Create test Product
         $this->product = Product::create([
             'name'            => 'Wireless Earbuds Pro',
-            'slug'            => 'wireless-earbuds-pro-' . Str::random(6),
             'sku'             => 'SKU-' . strtoupper(Str::random(6)),
             'category_id'     => $this->category->id,
             'qty'             => 25,
@@ -142,20 +141,16 @@ class EcommerceSystemTest extends TestCase
 
         // Create a discount coupon
         $coupon = Coupon::create([
-            'code'          => 'SAVE10_' . strtoupper(Str::random(4)),
-            'type'          => 'percentage',
-            'discount'      => 10,
-            'min_amount'    => 500,
-            'start_date'    => now()->subDay()->toDateString(),
-            'end_date'      => now()->addDays(7)->toDateString(),
-            'status'        => 1,
-            'usage_limit'   => 100,
-            'times_used'    => 0,
+            'code'             => 'SAVE10_' . strtoupper(Str::random(4)),
+            'type'             => 'percent',
+            'value'            => 10,
+            'min_order_amount' => 500,
+            'status'           => 1,
         ]);
 
         // Apply Coupon
         $applyResponse = $this->actingAs($this->customerUser)->post('/cart/coupon/apply', [
-            'code' => $coupon->code,
+            'coupon_code' => $coupon->code,
         ]);
         $applyResponse->assertRedirect('/cart');
         $applyResponse->assertSessionHas('success');
@@ -194,6 +189,7 @@ class EcommerceSystemTest extends TestCase
         ]);
 
         // Expect redirect to success screen
+        $orderResponse->assertSessionHasNoErrors();
         $orderResponse->assertRedirect();
         $this->assertTrue(session()->has('order_number') || str_contains($orderResponse->headers->get('Location'), '/checkout/success'));
 
@@ -210,7 +206,7 @@ class EcommerceSystemTest extends TestCase
 
         // Verify StockMovement audit trail created
         $stockMovement = StockMovement::where('product_id', $this->product->id)
-            ->where('reference_type', 'Online Order')
+            ->where('reference_type', 'Order')
             ->where('reference_id', $order->id)
             ->first();
 

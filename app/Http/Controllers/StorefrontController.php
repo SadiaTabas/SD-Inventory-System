@@ -166,8 +166,18 @@ class StorefrontController extends Controller
     {
         if ($product instanceof Product) {
             $prod = $product;
+        } elseif (is_numeric($product)) {
+            $prod = Product::findOrFail($product);
         } else {
-            $prod = Product::where('slug', $product)->orWhere('id', $product)->firstOrFail();
+            if (preg_match('/-(\d+)$/', $product, $matches)) {
+                $prod = Product::find($matches[1]);
+            }
+            if (!isset($prod) || !$prod) {
+                $prod = Product::where('sku', $product)->first();
+            }
+            if (!isset($prod) || !$prod) {
+                abort(404, 'Product not found.');
+            }
         }
 
         if (!$prod->status) {
