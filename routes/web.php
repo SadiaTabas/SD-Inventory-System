@@ -36,11 +36,24 @@ use Illuminate\Http\Request;
 |--------------------------------------------------------------------------
 */
 Route::get('/health-check', function () {
+    $dbStatus = 'disconnected';
+    $userCount = 0;
+    try {
+        $userCount = \App\Models\User::count();
+        $dbStatus = 'connected (' . \Illuminate\Support\Facades\DB::getDriverName() . ')';
+    } catch (\Throwable $e) {
+        $dbStatus = 'error: ' . $e->getMessage();
+    }
+
     return response()->json([
         'status' => 'ok',
         'message' => 'SD Inventory Laravel on Vercel is running!',
         'php' => PHP_VERSION,
         'laravel' => app()->version(),
+        'database' => $dbStatus,
+        'user_count' => $userCount,
+        'scheme' => request()->getScheme(),
+        'is_secure' => request()->isSecure(),
         'time' => now()->toDateTimeString(),
     ]);
 });

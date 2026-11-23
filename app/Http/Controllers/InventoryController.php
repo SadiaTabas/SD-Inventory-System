@@ -45,7 +45,7 @@ class InventoryController extends Controller
         $totalStockQty = (int) Product::sum('qty');
         $lowStockCount = Product::where('qty', '>', 0)->whereRaw('qty <= min_stock_level')->count();
         $outOfStockCount = Product::where('qty', '<=', 0)->count();
-        $inventoryValue = (float) Product::select(DB::raw('SUM(qty * IF(cost_price > 0, cost_price, price)) as val'))->value('val');
+        $inventoryValue = (float) Product::select(DB::raw('SUM(qty * CASE WHEN cost_price > 0 THEN cost_price ELSE price END) as val'))->value('val');
 
         return view('inventory.index', compact(
             'products',

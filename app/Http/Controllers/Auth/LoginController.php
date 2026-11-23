@@ -44,18 +44,25 @@ class LoginController extends Controller
 
         $remember = $request->boolean('remember');
 
-        if (Auth::attempt($credentials, $remember)) {
-            $request->session()->regenerate();
+        try {
+            if (Auth::attempt($credentials, $remember)) {
+                $request->session()->regenerate();
 
-            // Merge guest cart if any
-            $this->cartService->getCart();
+                // Merge guest cart if any
+                $this->cartService->getCart();
 
-            // Redirect based on user role
-            if (Auth::user()->isAdmin()) {
-                return redirect()->route('admin.dashboard');
+                // Redirect based on user role
+                if (Auth::user()->isAdmin()) {
+                    return redirect()->route('admin.dashboard');
+                }
+
+                return redirect()->intended(route('customer.account'));
             }
-
-            return redirect()->intended(route('customer.account'));
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Login error: ' . $e->getMessage());
+            return back()->withErrors([
+                'email' => 'Unable to connect to authentication service. Please try again.',
+            ])->onlyInput('email');
         }
 
         return back()->withErrors([

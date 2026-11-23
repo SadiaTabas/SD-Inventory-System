@@ -62,7 +62,7 @@ class AdminController extends Controller
         $outOfStockCount = Product::where('qty', '<=', 0)->count();
 
         // Inventory valuation
-        $inventoryValuation = (float) Product::select(DB::raw('SUM(qty * IF(cost_price > 0, cost_price, price)) as total_val'))->value('total_val');
+        $inventoryValuation = (float) Product::select(DB::raw('SUM(qty * CASE WHEN cost_price > 0 THEN cost_price ELSE price END) as total_val'))->value('total_val');
 
         // Recent stock movements
         $recentStockMovements = StockMovement::with('product')->latest()->take(6)->get();
@@ -76,10 +76,14 @@ class AdminController extends Controller
         $recentOrders = Order::with(['user', 'customer'])->latest()->take(8)->get();
 
         // 6. Chart Data: Monthly Revenue for the current year
+        $monthExpr = DB::getDriverName() === 'sqlite' 
+            ? "CAST(strftime('%m', created_at) AS INTEGER) as month" 
+            : 'MONTH(created_at) as month';
+
         $monthlySales = Order::where('status', '!=', 'cancelled')
             ->whereYear('created_at', now()->year)
             ->select(
-                DB::raw('MONTH(created_at) as month'),
+                DB::raw($monthExpr),
                 DB::raw('SUM(total_amount) as total')
             )
             ->groupBy('month')

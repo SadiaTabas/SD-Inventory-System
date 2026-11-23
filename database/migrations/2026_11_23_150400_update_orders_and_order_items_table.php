@@ -10,7 +10,9 @@ return new class extends Migration
     public function up(): void
     {
         // Make customer_id nullable in orders table
-        DB::statement('ALTER TABLE orders MODIFY customer_id BIGINT UNSIGNED NULL');
+        if (DB::getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE orders MODIFY customer_id BIGINT UNSIGNED NULL');
+        }
 
         Schema::table('orders', function (Blueprint $table) {
             if (!Schema::hasColumn('orders', 'user_id')) {
