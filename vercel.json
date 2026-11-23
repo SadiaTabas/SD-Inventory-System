@@ -38,6 +38,7 @@
   "env": {
     "APP_ENV": "production",
     "APP_DEBUG": "false",
+    "DB_CONNECTION": "mysql",
     "APP_CONFIG_CACHE": "/tmp/storage/framework/cache/config.php",
     "APP_EVENTS_CACHE": "/tmp/storage/framework/cache/events.php",
     "APP_PACKAGES_CACHE": "/tmp/storage/framework/cache/packages.php",

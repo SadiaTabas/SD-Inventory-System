@@ -15,27 +15,33 @@ class CartService
 {
     public function getCart(): Cart
     {
-        if (Auth::check()) {
-            $user = Auth::user();
-            $cart = Cart::firstOrCreate(['user_id' => $user->id]);
+        try {
+            if (Auth::check()) {
+                $user = Auth::user();
+                $cart = Cart::firstOrCreate(['user_id' => $user->id]);
 
-            // If there's also a session-based cart, merge it
-            $sessionId = Session::getId();
-            $sessionCart = Cart::where('session_id', $sessionId)
-                ->whereNull('user_id')
-                ->first();
+                // If there's also a session-based cart, merge it
+                $sessionId = Session::getId();
+                $sessionCart = Cart::where('session_id', $sessionId)
+                    ->whereNull('user_id')
+                    ->first();
 
-            if ($sessionCart && $sessionCart->id !== $cart->id) {
-                $this->mergeCarts($sessionCart, $cart);
+                if ($sessionCart && $sessionCart->id !== $cart->id) {
+                    $this->mergeCarts($sessionCart, $cart);
+                }
+
+                return $cart->load(['items.product']);
             }
 
+            $sessionId = Session::getId();
+            $cart = Cart::firstOrCreate(['session_id' => $sessionId, 'user_id' => null]);
+
             return $cart->load(['items.product']);
+        } catch (\Throwable $e) {
+            $cart = new Cart();
+            $cart->setRelation('items', collect());
+            return $cart;
         }
-
-        $sessionId = Session::getId();
-        $cart = Cart::firstOrCreate(['session_id' => $sessionId, 'user_id' => null]);
-
-        return $cart->load(['items.product']);
     }
 
     public function addItem(int $productId, int $quantity = 1): array
@@ -172,48 +178,63 @@ class CartService
 
     public function getCartTotals(): array
     {
-        $cart = $this->getCart();
-        $subtotal = $this->calculateSubtotal($cart);
+        try {
+            $cart = $this->getCart();
+            $subtotal = $this->calculateSubtotal($cart);
 
-        $discount = 0.00;
-        $coupon = null;
+            $discount = 0.00;
+            $coupon = null;
 
-        if ($cart->coupon_code) {
-            $coupon = Coupon::where('code', $cart->coupon_code)->where('status', true)->first();
-            if ($coupon && $subtotal >= $coupon->min_order_amount) {
-                $discount = $coupon->calculateDiscount($subtotal);
-            } else {
-                // Invalidate if subtotal dropped below min order
-                $cart->update(['coupon_code' => null]);
-                $coupon = null;
+            if ($cart->coupon_code) {
+                $coupon = Coupon::where('code', $cart->coupon_code)->where('status', true)->first();
+                if ($coupon && $subtotal >= $coupon->min_order_amount) {
+                    $discount = $coupon->calculateDiscount($subtotal);
+                } else {
+                    $cart->update(['coupon_code' => null]);
+                    $coupon = null;
+                }
             }
+
+            $defaultDeliveryCharge = (float) BusinessSetting::get('default_delivery_charge', 60.00);
+            $freeDeliveryThreshold = (float) BusinessSetting::get('free_delivery_threshold', 0.00);
+
+            $deliveryCharge = $defaultDeliveryCharge;
+            if ($freeDeliveryThreshold > 0 && $subtotal >= $freeDeliveryThreshold) {
+                $deliveryCharge = 0.00;
+            }
+
+            if ($subtotal <= 0) {
+                $deliveryCharge = 0.00;
+            }
+
+            $total = max(0, ($subtotal - $discount) + $deliveryCharge);
+
+            return [
+                'cart'              => $cart,
+                'items'             => $cart->items,
+                'subtotal'          => $subtotal,
+                'discount'          => $discount,
+                'coupon'            => $coupon,
+                'coupon_code'       => $cart->coupon_code,
+                'delivery_charge'   => $deliveryCharge,
+                'total'             => $total,
+                'total_items_count' => (int) $cart->items->sum('quantity'),
+            ];
+        } catch (\Throwable $e) {
+            $cart = new Cart();
+            $cart->setRelation('items', collect());
+            return [
+                'cart'              => $cart,
+                'items'             => collect(),
+                'subtotal'          => 0.00,
+                'discount'          => 0.00,
+                'coupon'            => null,
+                'coupon_code'       => null,
+                'delivery_charge'   => 0.00,
+                'total'             => 0.00,
+                'total_items_count' => 0,
+            ];
         }
-
-        $defaultDeliveryCharge = (float) BusinessSetting::get('default_delivery_charge', 60.00);
-        $freeDeliveryThreshold = (float) BusinessSetting::get('free_delivery_threshold', 0.00);
-
-        $deliveryCharge = $defaultDeliveryCharge;
-        if ($freeDeliveryThreshold > 0 && $subtotal >= $freeDeliveryThreshold) {
-            $deliveryCharge = 0.00;
-        }
-
-        if ($subtotal <= 0) {
-            $deliveryCharge = 0.00;
-        }
-
-        $total = max(0, ($subtotal - $discount) + $deliveryCharge);
-
-        return [
-            'cart'             => $cart,
-            'items'            => $cart->items,
-            'subtotal'         => $subtotal,
-            'discount'         => $discount,
-            'coupon'           => $coupon,
-            'coupon_code'      => $cart->coupon_code,
-            'delivery_charge'  => $deliveryCharge,
-            'total'            => $total,
-            'total_items_count'=> (int) $cart->items->sum('quantity'),
-        ];
     }
 
     protected function calculateSubtotal(Cart $cart): float

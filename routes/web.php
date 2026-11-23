@@ -35,6 +35,16 @@ use Illuminate\Http\Request;
 | Public Customer Storefront Routes
 |--------------------------------------------------------------------------
 */
+Route::get('/health-check', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'SD Inventory Laravel on Vercel is running!',
+        'php' => PHP_VERSION,
+        'laravel' => app()->version(),
+        'time' => now()->toDateTimeString(),
+    ]);
+});
+
 Route::get('/', [StorefrontController::class, 'index'])->name('home');
 Route::get('/shop', [StorefrontController::class, 'shop'])->name('shop');
 Route::get('/shop/category/{category}', [StorefrontController::class, 'category'])->name('shop.category');

@@ -27,5 +27,13 @@ putenv("VIEW_COMPILED_PATH={$storagePath}/framework/views");
 $_ENV['VIEW_COMPILED_PATH'] = "{$storagePath}/framework/views";
 $_SERVER['VIEW_COMPILED_PATH'] = "{$storagePath}/framework/views";
 
+putenv("SESSION_DRIVER=cookie");
+$_ENV['SESSION_DRIVER'] = 'cookie';
+$_SERVER['SESSION_DRIVER'] = 'cookie';
+
+putenv("CACHE_STORE=array");
+$_ENV['CACHE_STORE'] = 'array';
+$_SERVER['CACHE_STORE'] = 'array';
+
 // Forward request to Laravel public index
 require __DIR__ . '/../public/index.php';

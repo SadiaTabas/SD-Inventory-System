@@ -578,7 +578,11 @@
                 <a href="{{ route('home') }}" class="nav-link {{ request()->routeIs('home') ? 'active' : '' }}">Home</a>
                 <a href="{{ route('shop') }}" class="nav-link {{ request()->routeIs('shop') && !request('category') ? 'active' : '' }}">All Products</a>
                 @php
-                    $navCategories = \App\Models\Category::where('status', true)->take(6)->get();
+                    try {
+                        $navCategories = \App\Models\Category::where('status', true)->take(6)->get();
+                    } catch (\Throwable $e) {
+                        $navCategories = collect();
+                    }
                 @endphp
                 @foreach($navCategories as $cat)
                     <a href="{{ route('shop.category', $cat) }}" class="nav-link {{ request()->is('shop/category/' . $cat->id) ? 'active' : '' }}">{{ $cat->name }}</a>

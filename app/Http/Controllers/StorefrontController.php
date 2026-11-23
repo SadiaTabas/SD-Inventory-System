@@ -14,59 +14,68 @@ class StorefrontController extends Controller
 {
     public function index()
     {
-        // 1. Featured Categories with active product counts
-        $categories = Category::where('status', true)
-            ->withCount(['products' => function ($q) {
-                $q->where('status', true);
-            }])
-            ->get();
+        try {
+            // 1. Featured Categories with active product counts
+            $categories = Category::where('status', true)
+                ->withCount(['products' => function ($q) {
+                    $q->where('status', true);
+                }])
+                ->get();
 
-        // 2. Featured Products
-        $featuredProducts = Product::where('status', true)
-            ->where('featured', true)
-            ->with('category')
-            ->latest()
-            ->take(8)
-            ->get();
-
-        if ($featuredProducts->isEmpty()) {
+            // 2. Featured Products
             $featuredProducts = Product::where('status', true)
+                ->where('featured', true)
                 ->with('category')
                 ->latest()
                 ->take(8)
                 ->get();
-        }
 
-        // 3. Latest Arrivals
-        $newArrivals = Product::where('status', true)
-            ->with('category')
-            ->latest()
-            ->take(8)
-            ->get();
+            if ($featuredProducts->isEmpty()) {
+                $featuredProducts = Product::where('status', true)
+                    ->with('category')
+                    ->latest()
+                    ->take(8)
+                    ->get();
+            }
 
-        // 4. Best Selling Products
-        $bestSellerIds = OrderItem::select('product_id', DB::raw('SUM(quantity) as total_sold'))
-            ->groupBy('product_id')
-            ->orderByDesc('total_sold')
-            ->take(8)
-            ->pluck('product_id');
-
-        $bestSellers = Product::whereIn('id', $bestSellerIds)
-            ->where('status', true)
-            ->with('category')
-            ->get();
-
-        if ($bestSellers->isEmpty()) {
-            $bestSellers = Product::where('status', true)
-                ->where('qty', '>', 0)
+            // 3. Latest Arrivals
+            $newArrivals = Product::where('status', true)
                 ->with('category')
-                ->inRandomOrder()
+                ->latest()
                 ->take(8)
                 ->get();
-        }
 
-        // 5. Active promotional coupons
-        $coupons = Coupon::where('status', true)->latest()->take(4)->get();
+            // 4. Best Selling Products
+            $bestSellerIds = OrderItem::select('product_id', DB::raw('SUM(quantity) as total_sold'))
+                ->groupBy('product_id')
+                ->orderByDesc('total_sold')
+                ->take(8)
+                ->pluck('product_id');
+
+            $bestSellers = Product::whereIn('id', $bestSellerIds)
+                ->where('status', true)
+                ->with('category')
+                ->get();
+
+            if ($bestSellers->isEmpty()) {
+                $bestSellers = Product::where('status', true)
+                    ->where('qty', '>', 0)
+                    ->with('category')
+                    ->inRandomOrder()
+                    ->take(8)
+                    ->get();
+            }
+
+            // 5. Active promotional coupons
+            $coupons = Coupon::where('status', true)->latest()->take(4)->get();
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::warning('Database connection failed on storefront: ' . $e->getMessage());
+            $categories = collect();
+            $featuredProducts = collect();
+            $newArrivals = collect();
+            $bestSellers = collect();
+            $coupons = collect();
+        }
 
         return view('storefront.index', compact(
             'categories',
