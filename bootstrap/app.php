@@ -22,3 +22,11 @@ return Application::configure(basePath: dirname(__DIR__))
         //
     })
     ->create();
+
+if (!empty($_ENV['LARAVEL_STORAGE_PATH'])) {
+    $app->useStoragePath($_ENV['LARAVEL_STORAGE_PATH']);
+} elseif (!empty($_SERVER['LARAVEL_STORAGE_PATH'])) {
+    $app->useStoragePath($_SERVER['LARAVEL_STORAGE_PATH']);
+}
+
+return $app;

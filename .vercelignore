@@ -1,0 +1,10 @@
+/vendor
+/node_modules
+.git
+.github
+.env
+.env.example
+.phpunit.result.cache
+/tests
+/scratch
+*.log
